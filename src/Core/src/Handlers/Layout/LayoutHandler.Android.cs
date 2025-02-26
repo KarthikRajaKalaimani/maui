@@ -38,7 +38,10 @@ namespace Microsoft.Maui.Handlers
 
 			foreach (var child in VirtualView.OrderByZIndex())
 			{
-				PlatformView.AddView(child.ToPlatform(MauiContext));
+				var childPlatformView = child.ToPlatform(MauiContext);
+				if(childPlatformView.Parent is not null)
+				 childPlatformView.RemoveFromParent();
+				PlatformView.AddView(childPlatformView);
 			}
 		}
 
