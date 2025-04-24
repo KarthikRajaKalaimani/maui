@@ -175,8 +175,8 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			if (footerView != null)
 				footerHeight = footerView.Frame.Height;
 
-			return new CGRect(CollectionView.Frame.X, CollectionView.Frame.Y, CollectionView.Frame.Width,
-				Math.Abs(CollectionView.Frame.Height - (headerHeight + footerHeight)));
+			return new CGRect(CollectionView.Frame.X, headerHeight + footerHeight, CollectionView.Frame.Width,
+	Math.Abs(CollectionView.Frame.Height - (headerHeight + footerHeight)));
 		}
 
 		public override void ViewWillLayoutSubviews()
