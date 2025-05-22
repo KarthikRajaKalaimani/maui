@@ -20,7 +20,7 @@ namespace Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific
 		/// <summary>Bindable property for <see cref="WindowSoftInputModeAdjust"/>.</summary>
 		public static readonly BindableProperty WindowSoftInputModeAdjustProperty =
 			BindableProperty.Create("WindowSoftInputModeAdjust", typeof(WindowSoftInputModeAdjust),
-			typeof(Application), WindowSoftInputModeAdjust.Pan);
+			typeof(Application), WindowSoftInputModeAdjust.Unspecified);
 
 		/// <include file="../../../../docs/Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific/Application.xml" path="//Member[@MemberName='GetWindowSoftInputModeAdjust'][1]/Docs/*" />
 		public static WindowSoftInputModeAdjust GetWindowSoftInputModeAdjust(BindableObject element)
