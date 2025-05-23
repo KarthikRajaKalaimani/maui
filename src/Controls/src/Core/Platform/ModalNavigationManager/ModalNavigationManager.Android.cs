@@ -261,7 +261,10 @@ namespace Microsoft.Maui.Controls.Platform
 
 				if (attributes is not null)
 				{
-					dialog.Window.SetSoftInputMode(attributes.SoftInputMode);
+					if (Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific.Application._isExplicitlySetWindowSoftInputModeAdjust)
+					{
+						dialog.Window.SetSoftInputMode(attributes.SoftInputMode);
+					}
 				}
 
 				if (mainActivityWindow is not null)
