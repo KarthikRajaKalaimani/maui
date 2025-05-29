@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<local:BaseQuestionEntryTemplate
+    x:Class="Maui.Controls.Sample.QuestionTextEntry"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:Maui.Controls.Sample"
+    xmlns:models="clr-namespace:Maui.Controls.Sample"
+    x:Name="QuestionTextEntryControl"
+    x:DataType="models:Question">
+
+
+    <Grid
+        x:DataType="models:Question"
+        ColumnSpacing="0"
+        HorizontalOptions="FillAndExpand"
+        IsVisible="True"
+        RowSpacing="2"
+        VerticalOptions="StartAndExpand">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="2"/>
+            <RowDefinition Height="{OnPlatform iOS='*', Android='Auto', WinUI='Auto'}"/>
+            <RowDefinition Height="0"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="{Binding AnsweredByHeight}"/>
+            <RowDefinition Height="0"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="0.25*"/>
+            <ColumnDefinition Width="0.25*"/>
+            <ColumnDefinition Width="0.25*"/>
+            <ColumnDefinition Width="0.25*"/>
+        </Grid.ColumnDefinitions>
+
+        <BoxView
+            Grid.Row="0"
+            Grid.Column="0"
+            Grid.ColumnSpan="4"
+            BackgroundColor="{DynamicResource ColorListViewHeader}"/>
+
+
+
+        <FlexLayout
+            Grid.Row="1"
+            Grid.Column="0"
+            Grid.ColumnSpan="4"
+            Margin="10,2,80,2"
+            AlignContent="Start"
+            AlignItems="Start"
+            Direction="Row"
+            JustifyContent="Start"
+            Wrap="Wrap">
+            <Label Style="{StaticResource questionLabelStyle}">
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Style="{StaticResource questionLabelSpanStyle}"
+                              Text="{Binding Label}"/>
+                        <Span Style="{StaticResource questionLabelSpanStyle}"
+                              Text="{Binding UnitsText}"/>
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+        </FlexLayout>
+
+
+        <ContentView
+            Grid.Row="3"
+            Grid.Column="0"
+            Margin="0,10,0,10"
+            BackgroundColor="{DynamicResource ColorTransparent}">
+
+            <local:CustomEditor
+                x:Name="TheQuestionTextEntry"
+                AutoSize="Disabled"
+                HeightRequest="{Binding TextBoxHeight}"
+                InputTransparent="True"
+                IsEnabled="True"
+                IsQuestion="True"
+                Required="{Binding Required}"
+                Style="{StaticResource questionTextEditorStyle}"
+                Text="{Binding Value}"
+                TextChanged="OnTextChanged"/>
+            <ContentView.Triggers>
+                <DataTrigger
+                    Binding="{Binding IsNumeric}"
+                    TargetType="ContentView"
+                    Value="True">
+                    <Setter Property="Grid.ColumnSpan"
+                            Value="2"/>
+                </DataTrigger>
+                <DataTrigger
+                    Binding="{Binding IsNumeric}"
+                    TargetType="ContentView"
+                    Value="False">
+                    <Setter Property="Grid.ColumnSpan"
+                            Value="3"/>
+                </DataTrigger>
+            </ContentView.Triggers>
+            <ContentView.GestureRecognizers>
+                <TapGestureRecognizer
+                    CommandParameter="{x:Reference Name=TheQuestionTextEntry}"
+                    NumberOfTapsRequired="1"/>
+            </ContentView.GestureRecognizers>
+        </ContentView>
+
+        <Label
+            Grid.Row="4"
+            Grid.Column="0"
+            Grid.ColumnSpan="4"
+            IsVisible="False"
+            Style="{StaticResource questionErrorStyle}">
+            <Label.Triggers>
+                <DataTrigger
+                    TargetType="Label"
+                    Value="True">
+                    <Setter Property="IsVisible"
+                            Value="True"/>
+                </DataTrigger>
+                <DataTrigger
+                    Binding="{Binding Alarmed}"
+                    TargetType="Label"
+                    Value="True">
+                    <Setter Property="TextColor"
+                            Value="{DynamicResource ColorErrorTextInAlarm}"/>
+                </DataTrigger>
+            </Label.Triggers>
+        </Label>
+
+        <Label
+            Grid.Row="5"
+            Grid.Column="0"
+            Grid.ColumnSpan="4"
+            Margin="10,5,10,5"
+            FontAttributes="Italic"
+            Style="{StaticResource questionLabelStyle}"
+            Text="{Binding AnsweredByText}"/>
+
+        <Grid.Triggers>
+            <DataTrigger
+                Binding="{Binding Alarmed}"
+                TargetType="Grid"
+                Value="True">
+                <Setter Property="Style"
+                        Value="{StaticResource QuestionBackgroundAlarmed}"/>
+            </DataTrigger>
+            <DataTrigger
+                Binding="{Binding Alarmed}"
+                TargetType="Grid"
+                Value="False">
+                <Setter Property="Style"
+                        Value="{StaticResource QuestionBackground}"/>
+            </DataTrigger>
+        </Grid.Triggers>
+
+    </Grid>
+</local:BaseQuestionEntryTemplate>

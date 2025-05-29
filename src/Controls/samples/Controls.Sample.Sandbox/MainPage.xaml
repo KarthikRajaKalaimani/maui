@@ -1,5 +1,166 @@
-﻿<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="Maui.Controls.Sample.MainPage"
-             xmlns:local="clr-namespace:Maui.Controls.Sample">
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="Maui.Controls.Sample.MainPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:Maui.Controls.Sample"
+    xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
+    xmlns:local="clr-namespace:Maui.Controls.Sample"
+    xmlns:models="clr-namespace:Maui.Controls.Sample"
+    x:DataType="local:MainPageViewModel">
+
+    <Grid
+        Margin="0,0,0,0"
+        Padding="0,0,0,0"
+        ColumnSpacing="0"
+        RowSpacing="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="{OnPlatform iOS='30*', Android='34*', WinUI='30*'}"/>
+            <ColumnDefinition Width="{OnPlatform iOS='5', Android='2', WinUI='5'}"/>
+            <ColumnDefinition Width="{OnPlatform iOS='70*', Android='66*', WinUI='70*'}"/>
+            <ColumnDefinition Width="{OnPlatform iOS='5', Android='2', WinUI='5'}"/>
+        </Grid.ColumnDefinitions>
+
+
+        <CollectionView
+            Grid.Row="0"
+            Grid.Column="0"
+            BackgroundColor="Transparent"
+            IsEnabled="{Binding EnableCategories}"
+            IsGrouped="False"
+            ItemSizingStrategy="MeasureAllItems"
+            ItemsLayout="VerticalList"
+            ItemsSource="{Binding Categories}"
+            SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+            SelectionChanged="CollectionView_SelectionChanged"
+            SelectionMode="Single">
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:Category">
+                    <!--<controls:CustomViewCell>-->
+                    <Grid Margin="5,10,5,10"
+                          RowSpacing="3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{OnPlatform iOS={OnIdiom Phone='60*', Tablet='70*'}, Android='67*', WinUI='70*'}"/>
+                            <ColumnDefinition Width="{OnPlatform iOS={OnIdiom Phone='20*', Tablet='20*'}, Android='23*', WinUI='20*'}"/>
+                            <ColumnDefinition Width="{OnPlatform iOS={OnIdiom Phone='20*', Tablet='10*'}, Android='28', WinUI='10*'}"/>
+
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Label
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            Text="{Binding Name}"/>
+
+
+                        <Label
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            FontAttributes="None"
+                            HorizontalTextAlignment="End">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding TotalAnsweredQuestions}"/>
+                                    <Span Text="{Binding TotalEligibleQuestions, StringFormat='/{0}'}"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+
+
+                    </Grid>
+                    <!--</controls:CustomViewCell>-->
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Button
+            Grid.Row="0"
+            Grid.Column="0"
+            Margin="0,0,5,10"
+            BackgroundColor="DarkGreen"
+            BorderWidth="0"
+            Command="{Binding ClickCommandButton}"
+            CommandParameter="Reset"
+            CornerRadius="10"
+            FontSize="16"
+            HeightRequest="40"
+            HorizontalOptions="Center"
+            Text="Reset"
+            TextColor="White"
+            VerticalOptions="End"
+            WidthRequest="80"/>
+
+        <BoxView
+            Grid.Row="0"
+            Grid.Column="1"
+            BackgroundColor="{DynamicResource ColorListViewHeader}"/>
+
+
+        <CollectionView
+            Grid.Row="0"
+            Grid.Column="2"
+            BackgroundColor="{DynamicResource ColorListViewHeader}"
+            IsGrouped="True"
+            IsVisible="{Binding QuestionsVisible}"
+            ItemSizingStrategy="MeasureAllItems"
+            ItemTemplate="{StaticResource questionEntryTemplateSelector}"
+            ItemsLayout="VerticalList"
+            ItemsSource="{Binding QuestionsGrouped}"
+            SelectedItem="{Binding SelectedQuestion, Mode=TwoWay}"
+            SelectionMode="Single"
+            VerticalOptions="FillAndExpand">
+
+            <CollectionView.GroupHeaderTemplate>
+                <DataTemplate x:DataType="models:QuestionGrouping">
+                    <!--<ViewCell>-->
+                    <Grid
+                        Margin="{OnPlatform iOS='0,0,0,0',
+                                            Android='0,0,0,0',
+                                            WinUI='0,5,0,0'}"
+                        Padding="10,5,10,5"
+                        BackgroundColor="{DynamicResource ColorQuestionGroupHeader}"
+                        ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="50"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="{OnPlatform iOS='*', Android='Auto', WinUI='Auto'}"/>
+                        </Grid.RowDefinitions>
+
+                        <Label
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            Text="{Binding Key}"/>
+
+                        <Button
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            BackgroundColor="{DynamicResource ColorTransparent}"
+                            HeightRequest="30"
+                            HorizontalOptions="End"
+                            Text="btn"
+                            TextColor="{DynamicResource ColorWhite}"
+                            VerticalOptions="Start"/>
+
+                    </Grid>
+
+
+                    <!--</ViewCell>-->
+                </DataTemplate>
+            </CollectionView.GroupHeaderTemplate>
+        </CollectionView>
+        <BoxView
+            Grid.Row="0"
+            Grid.Column="3"
+            BackgroundColor="{DynamicResource ColorListViewHeader}"/>
+    </Grid>
+
 </ContentPage>

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<controls:BaseQuestionEntryTemplate
+    x:Class="Maui.Controls.Sample.QuestionSwitchEntry"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:Maui.Controls.Sample"
+    xmlns:local="clr-namespace:Maui.Controls.Sample"
+    xmlns:models="clr-namespace:Maui.Controls.Sample"
+    x:Name="QuestionSwitchEntryControl"
+    x:DataType="models:Question">
+
+    <Grid
+        x:Name="QuestionGrid"
+        ColumnSpacing="0"
+        HorizontalOptions="FillAndExpand"
+        IsVisible="{Binding Visible}"
+        RowSpacing="2"
+        VerticalOptions="StartAndExpand">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="2"/>
+            <RowDefinition Height="{OnPlatform iOS='*', Android='Auto', WinUI='Auto'}"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="{Binding AnsweredByHeight}"/>
+            <RowDefinition Height="0"/>
+        </Grid.RowDefinitions>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="0.25*"/>
+            <ColumnDefinition Width="0.25*"/>
+            <ColumnDefinition Width="0.25*"/>
+            <ColumnDefinition Width="0.25*"/>
+        </Grid.ColumnDefinitions>
+
+        <BoxView
+            Grid.Row="0"
+            Grid.Column="0"
+            Grid.ColumnSpan="4"
+            BackgroundColor="{DynamicResource ColorListViewHeader}"/>
+
+
+        <Label
+            Grid.Row="1"
+            Grid.Column="0"
+            Grid.ColumnSpan="4"
+            Margin="10,2,80,2"
+            Style="{StaticResource questionLabelStyle}"
+            Text="{Binding Label}"/>
+
+        <FlexLayout
+            x:Name="SwitchGroup"
+            Grid.Row="2"
+            Grid.Column="0"
+            Grid.ColumnSpan="3"
+            Margin="10,0,10,0"
+            AlignContent="Start"
+            AlignItems="Start"
+            BindableLayout.ItemsSource="{Binding Options}"
+            Direction="Row"
+            IsEnabled="True"
+            JustifyContent="Start"
+            VerticalOptions="Start"
+            Wrap="Wrap">
+            <BindableLayout.ItemTemplate>
+                <DataTemplate x:DataType="models:QuestionOption">
+                    <Grid ColumnSpacing="6"
+                            RowSpacing="0">
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="40"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!--
+                            10-10-24 anc
+                            Per this issue: Switch.Toggled Triggering & Binding Problems #22137
+                            Added Mode=OneWay to the IsToggled binding.
+                            What was happening: if you toggled a switch on, it would turn on and then immediately turn off (and vice versa).
+                        -->
+                        <Switch
+                            x:Name="SwitchControl"
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            IsEnabled="{Binding Source={x:Reference SwitchGroup}, Path=IsEnabled, x:DataType=FlexLayout}"
+                            IsToggled="{Binding IsSelected, Mode=OneWay}"
+                            OnColor="{DynamicResource ColorQuestionAnswered}"
+                            Style="{StaticResource switchStyle}"
+                            Toggled="OnSwitchToggled"/>
+                        <Label
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            Style="{StaticResource questionSwitchLabelStyle}"
+                            Text="{Binding Text}">
+                            <Label.Triggers>
+                                <DataTrigger
+                                    Binding="{Binding Source={x:Reference SwitchControl}, Path=IsToggled, x:DataType=Switch}"
+                                    TargetType="Label"
+                                    Value="True">
+                                    <Setter Property="TextColor"
+                                            Value="{DynamicResource ColorQuestionAnswered}"/>
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+
+                    </Grid>
+
+                </DataTemplate>
+            </BindableLayout.ItemTemplate>
+        </FlexLayout>
+
+        <Label
+            Grid.Row="3"
+            Grid.Column="0"
+            Grid.ColumnSpan="4"
+            Margin="10,5,10,5"
+            FontAttributes="Italic"
+            Style="{StaticResource questionLabelStyle}"
+            Text="{Binding AnsweredByText}"/>
+
+        <Grid.Triggers>
+            <DataTrigger
+                Binding="{Binding Alarmed}"
+                TargetType="Grid"
+                Value="True">
+                <Setter Property="Style"
+                        Value="{StaticResource QuestionBackgroundAlarmed}"/>
+            </DataTrigger>
+            <DataTrigger
+                Binding="{Binding Alarmed}"
+                TargetType="Grid"
+                Value="False">
+                <Setter Property="Style"
+                        Value="{StaticResource QuestionBackground}"/>
+            </DataTrigger>
+        </Grid.Triggers>
+    </Grid>
+</controls:BaseQuestionEntryTemplate>

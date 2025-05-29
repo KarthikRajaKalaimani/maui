@@ -1,13 +1,396 @@
 ﻿<?xml version = "1.0" encoding = "UTF-8" ?>
 <Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:local="clr-namespace:Maui.Controls.Sample"
+             xmlns:controls="clr-namespace:Maui.Controls.Sample"
+             xmlns:models="clr-namespace:Maui.Controls.Sample"
              x:Class="Maui.Controls.Sample.App">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
 
             </ResourceDictionary.MergedDictionaries>
+
+
+
+            <Color x:Key="ColorLabelText">#000000</Color>
+            <Color x:Key="ColorTextBackground">#FFFFFF</Color>
+            <Color x:Key="ColorTextBackgroundDisabled">#D6D6D6</Color>
+            <Color x:Key="ColorTextDisabled">#404040</Color>
+            <Color x:Key="ColorTextEntryBackgroundDisabled">#D6D6D6</Color>
+            <Color x:Key="ColorDarkTransparent">#90000000</Color>
+            <Color x:Key="ColorQuestionToolbar">#F0F0F0</Color>
+            <Color x:Key="ColorListViewHeader">#96ACD0</Color>
+            <Color x:Key="ColorQuestionGroupHeader">#238355</Color>
+            <Color x:Key="ColorQuestionControlBackground">#FFFFFF</Color>
+            <Color x:Key="ColorQuestionAnswered">#2583b3</Color>
+            <Color x:Key="ColorAlarmBackground">#ffc6cb</Color>
+            <Color x:Key="ColorSelectedRow">#EEB111</Color>
+
+
+            <Color x:Key="ColorBlack">#000000</Color>
+            <Color x:Key="ColorWhite">#FFFFFF</Color>
+            <Color x:Key="ColorTransparent">Transparent</Color>
+
+
+            <Color x:Key="ColorWindowBackground">#EAEAEA</Color>
+            <Color x:Key="ColorPopupWindow">#C0C0C0</Color>
+
+
+            <OnPlatform x:Key="InputTextSize"
+                    x:TypeArguments="x:Double">
+                <On Platform="Default"
+                        Value="14"/>
+                <On Platform="iOS"
+                        Value="{OnIdiom Phone='12', Tablet='16'}"/>
+                <On Platform="Android"
+                        Value="14"/>
+                <On Platform="WinUI"
+                        Value="14"/>
+            </OnPlatform>
+            <OnPlatform x:Key="LabelTextSize"
+                    x:TypeArguments="x:Double">
+                <On Platform="Default"
+                        Value="14"/>
+                <On Platform="iOS"
+                        Value="{OnIdiom Phone='12', Tablet='16'}"/>
+                <On Platform="Android"
+                        Value="14"/>
+                <On Platform="WinUI"
+                        Value="14"/>
+            </OnPlatform>
+            <OnPlatform x:Key="ListViewMainLabelTextSize"
+                    x:TypeArguments="x:Double">
+                <On Platform="Default"
+                        Value="13"/>
+                <On Platform="iOS"
+                        Value="{OnIdiom Phone='11', Tablet='15'}"/>
+                <On Platform="Android"
+                        Value="13"/>
+                <On Platform="WinUI"
+                        Value="13"/>
+            </OnPlatform>
+            <OnPlatform x:Key="TableHeaderLabelTextSize"
+                    x:TypeArguments="x:Double">
+                <On Platform="Default"
+                        Value="16"/>
+                <On Platform="iOS"
+                        Value="{OnIdiom Phone='13', Tablet='17'}"/>
+                <On Platform="Android"
+                        Value="16"/>
+                <On Platform="WinUI"
+                        Value="16"/>
+            </OnPlatform>
+            <OnPlatform x:Key="QuestionToolbarFontSize"
+                    x:TypeArguments="x:Double">
+                <On Platform="Default"
+                        Value="20"/>
+                <On Platform="iOS"
+                        Value="{OnIdiom Phone='16', Tablet='20'}"/>
+                <On Platform="Android"
+                        Value="20"/>
+                <On Platform="WinUI"
+                        Value="20"/>
+            </OnPlatform>
+
+
+
+            <Style x:Key="formTextEditorStyle"
+                    TargetType="controls:CustomEditor">
+                <Setter Property="TextColor"
+                        Value="{DynamicResource ColorLabelText}"/>
+                <Setter Property="MinimumHeightRequest"
+                        Value="40"/>
+                <Setter Property="FontSize"
+                        Value="{DynamicResource InputTextSize}"/>
+                <Setter Property="Margin"
+                        Value="0,0,0,0"/>
+                <Style.Triggers>
+                    <Trigger TargetType="controls:CustomEditor"
+                            Property="IsEnabled"
+                            Value="False">
+                        <Setter Property="BackgroundColor"
+                                Value="{OnPlatform Android={DynamicResource ColorTextBackgroundDisabled}, iOS={DynamicResource ColorTextBackgroundDisabled}, WinUI={DynamicResource ColorTextEntryBackgroundDisabled}}"/>
+                        <Setter Property="TextColor"
+                                Value="{DynamicResource ColorTextDisabled}"/>
+                    </Trigger>
+                    <Trigger TargetType="controls:CustomEditor"
+                            Property="IsFocused"
+                            Value="True">
+                        <Setter Property="BackgroundColor"
+                                Value="{DynamicResource ColorTextBackground}"/>
+                        <Setter Property="TextColor"
+                                Value="{OnPlatform Android={DynamicResource ColorLabelText}, iOS={DynamicResource ColorLabelText}, WinUI={DynamicResource ColorLabelText}}"/>
+                    </Trigger>
+                    <Trigger TargetType="controls:CustomEditor"
+                            Property="IsEnabled"
+                            Value="True">
+                        <Setter Property="BackgroundColor"
+                                Value="{DynamicResource ColorTextBackground}"/>
+                        <Setter Property="TextColor"
+                                Value="{OnPlatform Android={DynamicResource ColorLabelText}, iOS={DynamicResource ColorLabelText}, WinUI={DynamicResource ColorLabelText}}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="listViewMainLabelStyle"
+                    TargetType="Label">
+                <Setter Property="TextColor"
+                        Value="{DynamicResource ColorLabelText}"/>
+                <Setter Property="FontSize"
+                        Value="{DynamicResource ListViewMainLabelTextSize}"/>
+                <Setter Property="HorizontalTextAlignment"
+                        Value="Start"/>
+                <Setter Property="LineBreakMode"
+                        Value="WordWrap"/>
+                <Setter Property="Margin"
+                        Value="0,10,0,10"/>
+            </Style>
+            <Style x:Key="listViewTotalsLabelStyle"
+                    TargetType="Label">
+                <Setter Property="TextColor"
+                        Value="{DynamicResource ColorLabelText}"/>
+                <Setter Property="FontSize"
+                        Value="{DynamicResource ListViewMainLabelTextSize}"/>
+                <Setter Property="VerticalTextAlignment"
+                        Value="End"/>
+                <Setter Property="LineBreakMode"
+                        Value="WordWrap"/>
+                <Setter Property="FontAttributes"
+                        Value="Italic"/>
+                <Setter Property="Margin"
+                        Value="0,10,0,3"/>
+                <Setter Property="TextDecorations"
+                        Value="Underline"/>
+            </Style>
+            <Style
+                x:Key="listViewMainLabelStyleBold"
+                BasedOn="{StaticResource listViewMainLabelStyle}"
+                TargetType="Label">
+                <Setter Property="FontAttributes"
+                        Value="Bold"/>
+                <Setter Property="Margin"
+                        Value="0,10,0,15"/>
+            </Style>
+            <Style x:Key="listViewQuestionGroupLabelStyle"
+                    TargetType="Label">
+                <Setter Property="BackgroundColor"
+                        Value="{DynamicResource ColorQuestionGroupHeader}"/>
+                <Setter Property="TextColor"
+                        Value="{DynamicResource ColorWhite}"/>
+                <Setter Property="FontSize"
+                        Value="{DynamicResource TableHeaderLabelTextSize}"/>
+                <Setter Property="FontAttributes"
+                        Value="Bold"/>
+                <Setter Property="HorizontalTextAlignment"
+                        Value="Start"/>
+                <Setter Property="VerticalTextAlignment"
+                        Value="Center"/>
+                <Setter Property="LineBreakMode"
+                        Value="{OnPlatform iOS='TailTruncation', WinUI='WordWrap', Android='WordWrap'}"/>
+            </Style>
+            <Style x:Key="questionLabelStyle"
+                    TargetType="Label">
+                <Setter Property="TextColor"
+                        Value="{DynamicResource ColorLabelText}"/>
+                <Setter Property="FontSize"
+                        Value="{DynamicResource LabelTextSize}"/>
+                <Setter Property="FontAttributes"
+                        Value="Bold"/>
+                <Setter Property="Margin"
+                        Value="{OnPlatform Android='0,0,0,0', iOS='0,0,0,0', WinUI='0,0,0,0'}"/>
+                <Setter Property="VerticalTextAlignment"
+                        Value="Start"/>
+                <Setter Property="VerticalOptions"
+                        Value="StartAndExpand"/>
+                <Setter Property="LineBreakMode"
+                        Value="{OnPlatform iOS='WordWrap', WinUI='WordWrap', Android='WordWrap'}"/>
+            </Style>
+            <Style x:Key="questionLabelSpanStyle"
+                    TargetType="Span">
+                <Setter Property="TextColor"
+                        Value="{DynamicResource ColorLabelText}"/>
+                <Setter Property="FontSize"
+                        Value="{DynamicResource LabelTextSize}"/>
+                <Setter Property="FontAttributes"
+                        Value="Bold"/>
+            </Style>
+            <Style x:Key="questionContextMenuButtonStyle"
+                    TargetType="Button">
+                <Setter Property="HeightRequest"
+                        Value="40"/>
+                <Setter Property="WidthRequest"
+                        Value="40"/>
+                <Setter Property="BackgroundColor"
+                        Value="{DynamicResource ColorTransparent}"/>
+                <Setter Property="TextColor"
+                        Value="{DynamicResource ColorBlack}"/>
+                <Setter Property="Text"
+                        Value="&#xF141;"/>
+                <Setter Property="FontFamily"
+                        Value="FontAwesomeSolid"/>
+                <Setter Property="FontSize"
+                        Value="{DynamicResource QuestionToolbarFontSize}"/>
+                <Setter Property="BorderWidth"
+                        Value="0"/>
+            </Style>
+            <Style x:Key="questionTextEditorStyle"
+                    TargetType="controls:CustomEditor">
+                <Setter Property="TextColor"
+                        Value="{DynamicResource ColorLabelText}"/>
+                <Setter Property="FontSize"
+                        Value="{DynamicResource InputTextSize}"/>
+                <Setter Property="Margin"
+                        Value="10,0,10,0"/>
+                <Style.Triggers>
+                    <Trigger TargetType="controls:CustomEditor"
+                            Property="IsEnabled"
+                            Value="False">
+                        <Setter Property="BackgroundColor"
+                                Value="{OnPlatform Android={DynamicResource ColorTextBackgroundDisabled}, iOS={DynamicResource ColorTextBackgroundDisabled}, WinUI={DynamicResource ColorTextEntryBackgroundDisabled}}"/>
+                    </Trigger>
+                    <Trigger TargetType="controls:CustomEditor"
+                            Property="IsFocused"
+                            Value="True">
+                        <Setter Property="BackgroundColor"
+                                Value="{DynamicResource ColorTextBackground}"/>
+                    </Trigger>
+                    <Trigger TargetType="controls:CustomEditor"
+                            Property="IsEnabled"
+                            Value="True">
+                        <Setter Property="BackgroundColor"
+                                Value="{DynamicResource ColorTextBackground}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="questionErrorStyle"
+                    TargetType="Label">
+                <Setter Property="TextColor"
+                        Value="Red"/>
+                <Setter Property="FontSize"
+                        Value="13"/>
+                <Setter Property="FontAttributes"
+                        Value="Bold"/>
+                <Setter Property="Margin"
+                        Value="10,0,10,0"/>
+                <Setter Property="VerticalTextAlignment"
+                        Value="End"/>
+            </Style>
+            <Style x:Key="QuestionBackground"
+                    TargetType="{x:Type Grid}">
+                <Setter Property="BackgroundColor"
+                        Value="{DynamicResource ColorQuestionControlBackground}"/>
+            </Style>
+            <Style x:Key="QuestionBackgroundAlarmed"
+                    TargetType="{x:Type Grid}">
+                <Setter Property="BackgroundColor"
+                        Value="{DynamicResource ColorAlarmBackground}"/>
+            </Style>
+            <Style x:Key="questionSwitchLabelStyle"
+                    TargetType="Label">
+                <Setter Property="VerticalOptions"
+                        Value="Center"/>
+                <Setter Property="HeightRequest"
+                        Value="40"/>
+                <Setter Property="TextColor"
+                        Value="{DynamicResource ColorLabelText}"/>
+                <Setter Property="FontAttributes"
+                        Value="None"/>
+                <Setter Property="FontSize"
+                        Value="{DynamicResource InputTextSize}"/>
+                <Setter Property="VerticalTextAlignment"
+                        Value="Center"/>
+                <Setter Property="LineBreakMode"
+                        Value="WordWrap"/>
+                <Setter Property="Margin"
+                        Value="{OnPlatform iOS='10,-9,15,0', Android='5,0,0,0', WinUI='0,0,15,0'}"/>
+            </Style>
+            <Style x:Key="switchStyle"
+                    TargetType="Switch">
+                <Setter Property="VerticalOptions"
+                        Value="Center"/>
+                <Setter Property="WidthRequest"
+                        Value="{OnPlatform WinUI='40', iOS='40', Android='45'}"/>
+                <Setter Property="HeightRequest"
+                        Value="40"/>
+                <Setter Property="Margin"
+                        Value="{OnPlatform WinUI='0,4,0,0', iOS='0,5,0,0', Android='0,0,0,0'}"/>
+                <Style.Triggers>
+                    <Trigger TargetType="Switch"
+                            Property="IsEnabled"
+                            Value="False">
+                        <Setter Property="Opacity"
+                                Value="0.6"/>
+                    </Trigger>
+                    <MultiTrigger TargetType="Switch">
+                        <MultiTrigger.Conditions>
+                            <PropertyCondition Property="IsEnabled"
+                                    Value="True"/>
+                            <PropertyCondition Property="IsToggled"
+                                    Value="False"/>
+                        </MultiTrigger.Conditions>
+                        <MultiTrigger.Setters>
+                            <Setter Property="ThumbColor"
+                                    Value="{OnPlatform WinUI={DynamicResource ColorLabelText}, iOS='White'}"/>
+                        </MultiTrigger.Setters>
+                    </MultiTrigger>
+                    <MultiTrigger TargetType="Switch">
+                        <MultiTrigger.Conditions>
+                            <PropertyCondition Property="IsEnabled"
+                                    Value="True"/>
+                            <PropertyCondition Property="IsToggled"
+                                    Value="True"/>
+                        </MultiTrigger.Conditions>
+                        <MultiTrigger.Setters>
+                            <Setter Property="ThumbColor"
+                                    Value="{OnPlatform WinUI={DynamicResource ColorTextBackground}, iOS='White'}"/>
+                        </MultiTrigger.Setters>
+                    </MultiTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style
+                x:Key="popupPageQuestionLabelStyle"
+                BasedOn="{StaticResource questionLabelStyle}"
+                TargetType="Label">
+                <Setter Property="Margin"
+                        Value="0,0,0,0"/>
+            </Style>
+            <DataTemplate x:Key="QuestionTextTemplate"
+                          x:DataType="models:Question">
+                <controls:QuestionTextEntry x:Name="QuestionTextEntry"
+                                            Value="{Binding Value, FallbackValue=''}"/>
+            </DataTemplate>
+            <DataTemplate x:Key="QuestionSwitchTemplate"
+                          x:DataType="models:Question">
+                <controls:QuestionSwitchEntry x:Name="QuestionSwitchEntry"
+                                              Value="{Binding Value, FallbackValue=''}"/>
+            </DataTemplate>
+
+
+            <controls:QuestionEntryTemplateSelector
+                x:Key="questionEntryTemplateSelector"
+                QuestionSwitchTemplate="{StaticResource QuestionSwitchTemplate}"
+                QuestionTextTemplate="{StaticResource QuestionTextTemplate}"/>
+
+
+
+            <ControlTemplate x:Key="PopUpTextInputTemplate">
+                <AbsoluteLayout BackgroundColor="{DynamicResource ColorDarkTransparent}">
+                    <StackLayout
+                        AbsoluteLayout.LayoutBounds="0,0,1,1"
+                        AbsoluteLayout.LayoutFlags="All"
+                        HorizontalOptions="Fill"
+                        MaximumWidthRequest="600"
+                        Spacing="0"
+                        VerticalOptions="Fill">
+                        <StackLayout VerticalOptions="StartAndExpand">
+                            <ContentPresenter/>
+                        </StackLayout>
+
+                    </StackLayout>
+                </AbsoluteLayout>
+            </ControlTemplate>
+
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>
