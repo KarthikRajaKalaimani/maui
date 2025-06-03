@@ -54,11 +54,13 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 		internal void ClearSelection()
 		{
 			var selectedItemIndexes = CollectionView.GetIndexPathsForSelectedItems();
-
-			foreach (var index in selectedItemIndexes)
+			CollectionView.PerformBatchUpdates(null, _ =>
 			{
-				CollectionView.DeselectItem(index, true);
-			}
+				foreach (var index in selectedItemIndexes)
+				{
+					CollectionView.DeselectItem(index, true);
+				}
+			});
 		}
 
 		void FormsSelectItem(NSIndexPath indexPath)
