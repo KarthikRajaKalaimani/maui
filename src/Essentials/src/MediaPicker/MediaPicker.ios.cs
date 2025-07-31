@@ -429,32 +429,23 @@ namespace Microsoft.Maui.Media
 			FullPath = CreateTempFile();
 		}
 
-		string CreateTempFile()
+		string CreateTempFile(NSItemProvider provider = null)
 		{
-			try
+			string filePath = FileName;
+			if (provider.HasItemConformingTo(UTType.Image))
 			{
-				// Create a temporary file path
-				var tempDir = Path.GetTempPath();
-				var extension = GetTag(_identifier, UTType.TagClassFilenameExtension);
-				var tempFileName = $"{Guid.NewGuid()}.{extension}";
-				var tempPath = Path.Combine(tempDir, tempFileName);
-
-				// Write the data to the temporary file synchronously
-				// This is needed for FileImageSource compatibility
-				var data = _provider?.LoadDataRepresentationAsync(_identifier).GetAwaiter().GetResult();
-				if (data != null)
+				provider.LoadFileRepresentation(UTType.Image, (url, error) =>
 				{
-					File.WriteAllBytes(tempPath, data.ToArray());
-					return tempPath;
-				}
+					if (url != null)
+					{
+						// Copy the file to a temporary location
+						var tempPath = Path.Combine(Path.GetTempPath(), Path.GetFileName(url.Path));
+						File.Copy(url.Path, tempPath, true);
+						filePath = FileName;
+					}
+				});
 			}
-			catch
-			{
-				// If we can't create a temp file, fall back to the filename
-				// This maintains backward compatibility but may not work with FileImageSource
-			}
-			// Fallback - return just the filename (original behavior)
-			return FileName;
+			return filePath;
 		}
 
 		internal override async Task<Stream> PlatformOpenReadAsync()
