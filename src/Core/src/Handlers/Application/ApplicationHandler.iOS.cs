@@ -13,7 +13,11 @@ namespace Microsoft.Maui.Handlers
 		public static partial void MapTerminate(ApplicationHandler handler, IApplication application, object? args)
 		{
 #if __MACCATALYST__
-			NSApplication.SharedApplication.Terminate();
+for (int i = application.Windows.Count - 1; i >= 0; i--)
+{
+	application.CloseWindow(application.Windows[i]);
+}
+Environment.Exit(0);
 #else
 			handler.Logger?.LogWarning("iOS does not support programmatically terminating the app.");
 #endif
