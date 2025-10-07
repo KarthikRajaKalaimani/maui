@@ -290,6 +290,7 @@ namespace Microsoft.Maui.Controls.Platform
 						item.SetShiftingMode(enableItemShiftMode);
 #endif
 						item.SetChecked(item.ItemData.IsChecked);
+						item.Focusable = false;
 					}
 				}
 				menuView.UpdateMenuView();

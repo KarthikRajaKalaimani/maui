@@ -145,7 +145,7 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			_toolbarAppearanceTracker = _shellContext.CreateToolbarAppearanceTracker();
 
 			HookEvents();
-
+			_viewPager.GetChildAt(0).Focusable = false;
 			return _rootView = root;
 		}
 
