@@ -796,6 +796,16 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 				navigationController.SetNavigationBarHidden(!navBarVisible, true);
 
+				// Fix for issue #18371: Modal dismissal navigation bar appearance loss
+				// Refresh appearance tracking before view controller is shown to ensure proper Shell context
+				// This proactively triggers appearance recalculation when modal stack is cleared
+				if (_self._context?.Shell != null && _self.ShellSection != null)
+				{
+					// Trigger appearance refresh using Shell context instead of potentially stale modal page context
+					// This ensures navigation bar appearance uses correct Shell hierarchy after modal dismissal
+					((IShellController)_self._context.Shell).AppearanceChanged(_self.ShellSection, true);
+				}
+
 				var coordinator = viewController.GetTransitionCoordinator();
 				if (coordinator != null && coordinator.IsInteractive)
 				{
