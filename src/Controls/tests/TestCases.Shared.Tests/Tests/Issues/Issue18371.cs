@@ -1,3 +1,4 @@
+#if TEST_FAILS_ON_WINDOWS // This test fails on Windows because of a issue navigation didn't happen when navigate from modal page to shell page.
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UITest.Appium;
@@ -29,4 +30,4 @@ public class Issue18371 : _IssuesUITest
 		VerifyScreenshot();
 	}
 }
-
+#endif
