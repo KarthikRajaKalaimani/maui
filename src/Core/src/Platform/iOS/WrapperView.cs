@@ -129,6 +129,25 @@ namespace Microsoft.Maui.Platform
 			CrossPlatformLayout?.CrossPlatformArrange(Bounds.ToRectangle());
 		}
 
+		public override UIView? HitTest(CGPoint point, UIEvent? uievent)
+		{
+			// First check if the child view wants the touch
+			var result = base.HitTest(point, uievent);
+			
+			// If this WrapperView has gesture recognizers, we need to return ourselves
+			// so the gesture recognizers can process the touch
+			if (result != null && GestureRecognizers != null && GestureRecognizers.Length > 0)
+				return this;
+			
+			// If the result is this WrapperView itself (not a child),
+			// it means the touch landed in the wrapper but not in any child.
+			// In this case, return null to let touches pass through to views behind.
+			if (result == this)
+				return null;
+			
+			return result;
+		}
+
 		internal void Disconnect()
 		{
 			MaskLayer = null;
