@@ -279,8 +279,8 @@ internal static class LayoutFactory2
 		NSCollectionLayoutDimension groupWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1);
 		NSCollectionLayoutDimension groupHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1);
 		NSCollectionLayoutGroup group = null;
-
-		var layout = new UICollectionViewCompositionalLayout((sectionIndex, environment) =>
+		var layoutConfiguration = new UICollectionViewCompositionalLayoutConfiguration();
+		var layout = new CarouselUICollectionViewCompositionalLayout(weakItemsView, weakController, (sectionIndex, environment) =>
 		{
 			if (!weakItemsView.TryGetTarget(out var itemsView))
 			{
@@ -338,76 +338,8 @@ internal static class LayoutFactory2
 				? UICollectionLayoutSectionOrthogonalScrollingBehavior.GroupPagingCentered
 				: UICollectionLayoutSectionOrthogonalScrollingBehavior.None;
 
-			section.VisibleItemsInvalidationHandler = (items, offset, env) =>
-			{
-				if (!weakItemsView.TryGetTarget(out var itemsView) || !weakController.TryGetTarget(out var cv2Controller))
-				{
-					return;
-				}
-
-				var page = (offset.X + sectionMargin) / (env.Container.ContentSize.Width - sectionMargin * 2);
-
-				if (Math.Abs(page % 1) > (double.Epsilon * 100) || cv2Controller.ItemsSource.ItemCount <= 0)
-				{
-					return;
-				}
-
-				var pageIndex = (int)page;
-				var carouselPosition = pageIndex;
-
-				if (itemsView.Loop && cv2Controller.ItemsSource is ILoopItemsViewSource loopSource)
-				{
-					var maxIndex = loopSource.LoopCount - 1;
-
-					//To mimic looping, we needed to modify the ItemSource and inserted a new item at the beginning and at the end
-					if (pageIndex == maxIndex)
-					{
-						//When at last item, we need to change to 2nd item, so we can scroll right or left
-						pageIndex = 1;
-					}
-					else if (pageIndex == 0)
-					{
-						//When at first item, need to change to one before last, so we can scroll right or left
-						pageIndex = maxIndex - 1;
-					}
-
-					//since we added one item at the beginning of our ItemSource, we need to subtract one
-					carouselPosition = pageIndex - 1;
-
-					if (itemsView.Position != carouselPosition)
-					{
-						//If we are updating the ItemsSource, we don't want to scroll the CollectionView
-						if (cv2Controller.IsUpdating())
-						{
-							return;
-						}
-
-						var goToIndexPath = cv2Controller.GetScrollToIndexPath(carouselPosition);
-
-						if (!IsIndexPathValid(goToIndexPath, cv2Controller.CollectionView))
-						{
-							return;
-						}
-
-						//This will move the carousel to fake the loop
-						cv2Controller.CollectionView.ScrollToItem(
-							NSIndexPath.FromItemSection(pageIndex, 0),
-							UICollectionViewScrollPosition.Left,
-							false);
-					}
-				}
-
-				if (cv2Controller.IsRotating())
-				{
-					return;
-				}
-
-				//Update the CarouselView position
-				cv2Controller?.SetPosition(carouselPosition);
-			};
-
 			return section;
-		});
+		},layoutConfiguration);
 
 		return layout;
 	}
@@ -597,4 +529,140 @@ internal static class LayoutFactory2
 		}
 	}
 
+	class CarouselUICollectionViewCompositionalLayout : UICollectionViewCompositionalLayout
+	{
+		WeakReference<CarouselView> _weakItemsView;
+		WeakReference<CarouselViewController2> _weakController;
+
+		public CarouselUICollectionViewCompositionalLayout(WeakReference<CarouselView> weakItemsView, WeakReference<CarouselViewController2> weakController, UICollectionViewCompositionalLayoutSectionProvider sectionProvider, UICollectionViewCompositionalLayoutConfiguration configuration) : base(sectionProvider, configuration)
+		{
+			_weakItemsView = weakItemsView;
+			_weakController = weakController;
+		}
+
+	public override CGPoint TargetContentOffset(CGPoint proposedContentOffset, CGPoint scrollingVelocity)
+	{
+		if (!_weakItemsView.TryGetTarget(out var itemsView) || !_weakController.TryGetTarget(out var controller))
+		{
+			return base.TargetContentOffset(proposedContentOffset, scrollingVelocity);
+		}
+
+		// For horizontal layouts, use system's OrthogonalScrollingBehavior (GroupPagingCentered)
+		// For vertical layouts, we need to implement snapping ourselves
+		bool isHorizontal = itemsView.ItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal;
+		if (isHorizontal)
+		{
+			// Horizontal snapping is handled by OrthogonalScrollingBehavior.GroupPagingCentered
+			return base.TargetContentOffset(proposedContentOffset, scrollingVelocity);
+		}
+
+		// Handle vertical snapping
+		if (!(itemsView.ItemsLayout is LinearItemsLayout linearItemsLayout))
+		{
+			return base.TargetContentOffset(proposedContentOffset, scrollingVelocity);
+		}
+
+		var snapPointsType = linearItemsLayout.SnapPointsType;
+		var alignment = linearItemsLayout.SnapPointsAlignment;
+
+		if (snapPointsType == SnapPointsType.None)
+		{
+			return base.TargetContentOffset(proposedContentOffset, scrollingVelocity);
+		}
+
+		if (snapPointsType == SnapPointsType.MandatorySingle)
+		{
+			return ScrollSingle(alignment, proposedContentOffset, scrollingVelocity);
+		}
+
+		// For other snap types, use the current viewport to determine which item to snap to
+		// This ensures we snap based on where we ARE, not where we're GOING
+		var contentOffset = CollectionView.ContentOffset;
+		var viewport = new CGRect(contentOffset, CollectionView.Bounds.Size);
+		var visibleElements = LayoutAttributesForElementsInRect(viewport);
+
+		if (visibleElements.Length == 0)
+		{
+			return base.TargetContentOffset(proposedContentOffset, scrollingVelocity);
+		}
+
+		if (visibleElements.Length == 1)
+		{
+			return Items.SnapHelpers.AdjustContentOffset(contentOffset, visibleElements[0].Frame, viewport,
+				alignment, UICollectionViewScrollDirection.Vertical);
+		}
+
+		var alignmentTarget = Items.SnapHelpers.FindAlignmentTarget(alignment, contentOffset,
+			CollectionView, UICollectionViewScrollDirection.Vertical);
+
+		var bestCandidate = Items.SnapHelpers.FindBestSnapCandidate(visibleElements, viewport, alignmentTarget);
+
+		if (bestCandidate != null)
+		{
+			return Items.SnapHelpers.AdjustContentOffset(contentOffset, bestCandidate.Frame, viewport, alignment,
+				UICollectionViewScrollDirection.Vertical);
+		}
+
+		return Items.SnapHelpers.AdjustContentOffset(contentOffset, visibleElements[0].Frame, viewport, alignment,
+			UICollectionViewScrollDirection.Vertical);
+	}
+
+	CGPoint ScrollSingle(SnapPointsAlignment alignment, CGPoint proposedContentOffset, CGPoint scrollingVelocity)
+	{
+		var contentOffset = CollectionView.ContentOffset;
+		var viewport = new CGRect(contentOffset, CollectionView.Bounds.Size);
+
+		var alignmentTarget = Items.SnapHelpers.FindAlignmentTarget(alignment, contentOffset, CollectionView, UICollectionViewScrollDirection.Vertical);
+
+		var visibleElements = LayoutAttributesForElementsInRect(viewport);
+
+		var currentItem = Items.SnapHelpers.FindBestSnapCandidate(visibleElements, viewport, alignmentTarget);
+
+		if (currentItem == null)
+		{
+			return base.TargetContentOffset(proposedContentOffset, scrollingVelocity);
+		}
+
+		var currentIndex = Array.IndexOf(visibleElements, currentItem);
+		var span = 1;
+		var nextItem = Items.SnapHelpers.FindNextItem(visibleElements, UICollectionViewScrollDirection.Vertical, span, scrollingVelocity, currentIndex);
+		var targetOffset = Items.SnapHelpers.AdjustContentOffset(contentOffset, nextItem.Frame, viewport, alignment,
+			UICollectionViewScrollDirection.Vertical);
+		
+		// Handle looping by repositioning to real items when snapping to boundary duplicates
+		if (_weakItemsView.TryGetTarget(out var itemsView) && itemsView.Loop)
+		{
+			var totalItems = CollectionView.NumberOfItemsInSection(0);
+			if (totalItems > 2)
+			{
+				var targetIndexPath = nextItem.IndexPath;
+				
+				// If snapping to the first duplicate (IndexPath 0 = last item duplicate)
+				// Reposition to the real last item (IndexPath totalItems - 2)
+				if (targetIndexPath.Item == 0)
+				{
+					var realLastIndexPath = NSIndexPath.FromItemSection(totalItems - 2, 0);
+					var realLastItemAttributes = LayoutAttributesForItem(realLastIndexPath);
+					if (realLastItemAttributes != null)
+					{
+						return new CGPoint(targetOffset.X, realLastItemAttributes.Frame.Y);
+					}
+				}
+				// If snapping to the last duplicate (IndexPath totalItems - 1 = first item duplicate)
+				// Reposition to the real first item (IndexPath 1)
+				else if (targetIndexPath.Item == totalItems - 1)
+				{
+					var realFirstIndexPath = NSIndexPath.FromItemSection(1, 0);
+					var realFirstItemAttributes = LayoutAttributesForItem(realFirstIndexPath);
+					if (realFirstItemAttributes != null)
+					{
+						return new CGPoint(targetOffset.X, realFirstItemAttributes.Frame.Y);
+					}
+				}
+			}
+		}
+		
+		return targetOffset;
+	}
+}
 }
