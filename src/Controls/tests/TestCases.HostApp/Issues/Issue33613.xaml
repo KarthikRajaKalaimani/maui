@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Maui.Controls.Sample.Issues.Issue33613"
+             Title="Issue 33613">
+    
+    <NavigationPage.TitleView>
+        <Grid x:Name="TitleViewGrid" 
+              BackgroundColor="LightCoral" 
+              HorizontalOptions="FillAndExpand"
+              AutomationId="TitleViewGrid">
+            <Label Text="Custom Title View" 
+                   x:Name="TitleLabel"
+                   AutomationId="TitleLabel"
+                   TextColor="White"
+                   FontSize="18"
+                   FontAttributes="Bold"
+                   VerticalOptions="Center"
+                   HorizontalOptions="Center"/>
+        </Grid>
+    </NavigationPage.TitleView>
+    
+    <VerticalStackLayout Padding="20" Spacing="10">
+        <Label Text="Issue #33613 - Mac Catalyst TitleView Layout Test"
+               FontSize="20"
+               FontAttributes="Bold"
+               AutomationId="HeaderLabel"
+               HorizontalOptions="Center"/>
+        
+        <Label Text="This test verifies that NavigationPage.TitleView maintains consistent layout when the window is maximized on Mac Catalyst."
+               FontSize="14"
+               AutomationId="DescriptionLabel"
+               Margin="0,0,0,20"/>
+        
+        <Button x:Name="PushButton"
+                Text="Push Page with Back Button"
+                AutomationId="PushButton"
+                Clicked="OnPushClicked"
+                HorizontalOptions="Center"/>
+        
+        <Label x:Name="StatusLabel"
+                Text="Ready"
+                AutomationId="StatusLabel"
+                FontSize="16"
+                TextColor="Gray"
+                Margin="0,20,0,0"
+                HorizontalOptions="Center"/>
+        
+        <Label x:Name="TitleViewPositionLabel"
+               Text="TitleView X Position: (pending)"
+               AutomationId="TitleViewPositionLabel"
+               FontSize="14"
+               TextColor="Blue"
+               Margin="0,10,0,0"
+               HorizontalOptions="Center"/>
+    </VerticalStackLayout>
+</ContentPage>
