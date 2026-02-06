@@ -2346,6 +2346,21 @@ namespace Microsoft.Maui.Controls.Handlers.Compatibility
 						view.Measure(Bounds.Width, Bounds.Height);
 						layoutBounds = view.ComputeFrame(new Rect(0, 0, Bounds.Width, Bounds.Height));
 					}
+
+					// Apply horizontal margins only for iOS 26+ and pre-iOS 11
+					// Vertical margins are ignored since toolbar height is always fixed
+					if (OperatingSystem.IsIOSVersionAtLeast(26))
+					{
+						var margin = view.Margin;
+						var newWidth = layoutBounds.Width - (margin.Left + margin.Right);
+						layoutBounds = new Rect(
+							layoutBounds.X + margin.Left,
+							layoutBounds.Y,
+							newWidth,
+							layoutBounds.Height
+						);
+					}
+
 					_child.PlatformArrangeHandler(layoutBounds);
 				}
 				else if (_icon != null && Superview != null)
