@@ -141,7 +141,7 @@ namespace Microsoft.Maui.Handlers
      				if (platformView.On)
      				{
       					await Task.Delay(10); // Small delay, necessary to allow UIKit to complete its internal layout and styling processes before re-applying the custom color
-						if (VirtualView is ISwitch view && view.TrackColor is not null)
+						if (VirtualView is ISwitch view && view.ThumbColor is not null)
       					{
        						platformView.UpdateThumbColor(view);
       					}
