@@ -69,6 +69,7 @@ namespace Microsoft.Maui.Handlers
 
 			NSObject? _willEnterForegroundObserver;
 			NSObject? _windowDidBecomeKeyObserver;
+			NSObject? _didBecomeActiveObserver;
 
 			public void Connect(ISwitch virtualView, UISwitch platformView)
 			{
@@ -84,6 +85,11 @@ namespace Microsoft.Maui.Handlers
 						{
 							UpdateTrackOffColor(PlatformView);
 						}
+
+						if(OperatingSystem.IsMacCatalystVersionAtLeast(26,2))
+						{
+ 							UpdateThumbColor(PlatformView); 
+						}
 					});
 #elif IOS
 				_willEnterForegroundObserver = NSNotificationCenter.DefaultCenter.AddObserver(
@@ -94,6 +100,16 @@ namespace Microsoft.Maui.Handlers
 							UpdateTrackOffColor(PlatformView);
 						}
 					});
+				_didBecomeActiveObserver = NSNotificationCenter.DefaultCenter.AddObserver(UIApplication.DidBecomeActiveNotification, _=>
+    			{
+     				if (PlatformView is not null)
+     				{
+      					if(OperatingSystem.IsIOSVersionAtLeast(26,2))
+      					{
+       						UpdateThumbColor(PlatformView); 
+      					}
+     				}
+   				});
 #endif
 			}
 
@@ -116,6 +132,23 @@ namespace Microsoft.Maui.Handlers
 				});
 			}
 
+			// Ensures the Switch thumb color is updated correctly after system-level UI resets.
+			// This is necessary because UIKit may re-apply default styles to internal views after intial loading in iOS 26.2 and Mac Catalyst 26.2,
+			void UpdateThumbColor(UISwitch platformView)
+   			{
+    			DispatchQueue.MainQueue.DispatchAsync(async () =>
+    			{
+     				if (platformView.On)
+     				{
+      					await Task.Delay(10); // Small delay, necessary to allow UIKit to complete its internal layout and styling processes before re-applying the custom color
+						if (VirtualView is ISwitch view && view.TrackColor is not null)
+      					{
+       						platformView.UpdateThumbColor(view);
+      					}
+     				}
+    			});
+   			}
+
 			public void Disconnect(UISwitch platformView)
 			{
 				platformView.ValueChanged -= OnControlValueChanged;
@@ -129,6 +162,11 @@ namespace Microsoft.Maui.Handlers
 				{
 					NSNotificationCenter.DefaultCenter.RemoveObserver(_windowDidBecomeKeyObserver);
 					_windowDidBecomeKeyObserver = null;
+				}
+				if(_didBecomeActiveObserver is not null)
+				{
+					NSNotificationCenter.DefaultCenter.RemoveObserver(_didBecomeActiveObserver);
+					_didBecomeActiveObserver = null;
 				}
 			}
 
