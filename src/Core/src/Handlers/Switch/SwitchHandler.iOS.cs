@@ -21,13 +21,14 @@ namespace Microsoft.Maui.Handlers
 
 		protected override UISwitch CreatePlatformView()
 		{
-			return new MauiUISwitch(RectangleF.Empty, _proxy);
+			return new UISwitch(RectangleF.Empty);
 		}
 
 		protected override void ConnectHandler(UISwitch platformView)
 		{
 			base.ConnectHandler(platformView);
 			_proxy.Connect(VirtualView, platformView);
+    		_proxy.UpdateThumbColor(platformView);
 		}
 
 		protected override void DisconnectHandler(UISwitch platformView)
@@ -114,7 +115,7 @@ namespace Microsoft.Maui.Handlers
 
 			// Ensures the Switch thumb color is updated correctly after system-level UI resets.
 			// This is necessary because UIKit may re-apply default styles to internal views after intial loading in iOS 26.2 and Mac Catalyst 26.2,
-			void UpdateThumbColor(UISwitch platformView)
+			public void UpdateThumbColor(UISwitch platformView)
    			{
     			DispatchQueue.MainQueue.DispatchAsync(async () =>
     			{
@@ -128,14 +129,6 @@ namespace Microsoft.Maui.Handlers
      				}
     			});
    			}
-
-			public void UpdateThumbColorImmediately(UISwitch platformView)
-			{
-				if (platformView.On && VirtualView is ISwitch view && view.ThumbColor is not null)
-				{
-					platformView.UpdateThumbColor(view);
-				}
-			}
 
 			// Ensures the Switch track "OFF" color is updated correctly after system-level UI resets.
 			// This is necessary because UIKit may re-apply default styles to internal views during certain lifecycle events,
@@ -183,29 +176,6 @@ namespace Microsoft.Maui.Handlers
 				{
 					virtualView.IsOn = platformView.On;
 				}
-			}
-		}
-	}
-
-	// Custom UISwitch that detects when layout cycle is complete
-	class MauiUISwitch : UISwitch
-	{
-		readonly SwitchHandler.SwitchProxy _proxy;
-
-		public MauiUISwitch(RectangleF frame, SwitchHandler.SwitchProxy proxy) : base(frame)
-		{
-			_proxy = proxy;
-		}
-
-		public override void LayoutSubviews()
-		{
-			base.LayoutSubviews();
-			
-			// LayoutSubviews is called after the layout cycle completes
-			// This is the right place to update colors that depend on the final layout
-			if (OperatingSystem.IsIOSVersionAtLeast(26, 2) || OperatingSystem.IsMacCatalystVersionAtLeast(26, 2))
-			{
-				_proxy.UpdateThumbColorImmediately(this);
 			}
 		}
 	}
