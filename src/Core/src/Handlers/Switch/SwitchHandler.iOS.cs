@@ -85,10 +85,11 @@ namespace Microsoft.Maui.Handlers
 						if (PlatformView is not null)
 						{
 							UpdateTrackOffColor(PlatformView);
-						}
-						if(PlatformView is not null && OperatingSystem.IsMacCatalystVersionAtLeast(26,2))
-						{
- 							UpdateThumbColor(PlatformView); 
+							
+							if(OperatingSystem.IsMacCatalystVersionAtLeast(26,2))
+							{
+ 								UpdateThumbColor(PlatformView); 
+							}
 						}
 					});
 #elif IOS
