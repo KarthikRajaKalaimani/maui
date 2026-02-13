@@ -58,7 +58,7 @@ namespace Microsoft.Maui.Handlers
 			handler.UpdateValue(nameof(ISwitch.TrackColor));
 		}
 
-		internal class SwitchProxy
+		class SwitchProxy
 		{
 			WeakReference<ISwitch>? _virtualView;
 
@@ -180,3 +180,4 @@ namespace Microsoft.Maui.Handlers
 		}
 	}
 }
+
