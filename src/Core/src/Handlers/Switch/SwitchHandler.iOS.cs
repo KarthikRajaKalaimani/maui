@@ -21,7 +21,7 @@ namespace Microsoft.Maui.Handlers
 
 		protected override UISwitch CreatePlatformView()
 		{
-			return new UISwitch(RectangleF.Empty);
+			return new MauiUISwitch(RectangleF.Empty, _proxy);
 		}
 
 		protected override void ConnectHandler(UISwitch platformView)
@@ -57,7 +57,7 @@ namespace Microsoft.Maui.Handlers
 			handler.UpdateValue(nameof(ISwitch.TrackColor));
 		}
 
-		class SwitchProxy
+		internal class SwitchProxy
 		{
 			WeakReference<ISwitch>? _virtualView;
 
@@ -85,8 +85,7 @@ namespace Microsoft.Maui.Handlers
 						{
 							UpdateTrackOffColor(PlatformView);
 						}
-
-						if(OperatingSystem.IsMacCatalystVersionAtLeast(26,2))
+						if(PlatformView is not null && OperatingSystem.IsMacCatalystVersionAtLeast(26,2))
 						{
  							UpdateThumbColor(PlatformView); 
 						}
@@ -113,6 +112,31 @@ namespace Microsoft.Maui.Handlers
 #endif
 			}
 
+			// Ensures the Switch thumb color is updated correctly after system-level UI resets.
+			// This is necessary because UIKit may re-apply default styles to internal views after intial loading in iOS 26.2 and Mac Catalyst 26.2,
+			void UpdateThumbColor(UISwitch platformView)
+   			{
+    			DispatchQueue.MainQueue.DispatchAsync(async () =>
+    			{
+     				if (platformView.On)
+     				{
+      					await Task.Delay(10); // Small delay, necessary to allow UIKit to complete its internal layout and styling processes before re-applying the custom color
+						if (VirtualView is ISwitch view && view.ThumbColor is not null)
+      					{
+       						platformView.UpdateThumbColor(view);
+      					}
+     				}
+    			});
+   			}
+
+			public void UpdateThumbColorImmediately(UISwitch platformView)
+			{
+				if (platformView.On && VirtualView is ISwitch view && view.ThumbColor is not null)
+				{
+					platformView.UpdateThumbColor(view);
+				}
+			}
+
 			// Ensures the Switch track "OFF" color is updated correctly after system-level UI resets.
 			// This is necessary because UIKit may re-apply default styles to internal views during certain lifecycle events,
 			// especially when the app enters the background and returns to the foreground.
@@ -131,23 +155,6 @@ namespace Microsoft.Maui.Handlers
 					}
 				});
 			}
-
-			// Ensures the Switch thumb color is updated correctly after system-level UI resets.
-			// This is necessary because UIKit may re-apply default styles to internal views after intial loading in iOS 26.2 and Mac Catalyst 26.2,
-			void UpdateThumbColor(UISwitch platformView)
-   			{
-    			DispatchQueue.MainQueue.DispatchAsync(async () =>
-    			{
-     				if (platformView.On)
-     				{
-      					await Task.Delay(10); // Small delay, necessary to allow UIKit to complete its internal layout and styling processes before re-applying the custom color
-						if (VirtualView is ISwitch view && view.ThumbColor is not null)
-      					{
-       						platformView.UpdateThumbColor(view);
-      					}
-     				}
-    			});
-   			}
 
 			public void Disconnect(UISwitch platformView)
 			{
@@ -176,6 +183,29 @@ namespace Microsoft.Maui.Handlers
 				{
 					virtualView.IsOn = platformView.On;
 				}
+			}
+		}
+	}
+
+	// Custom UISwitch that detects when layout cycle is complete
+	class MauiUISwitch : UISwitch
+	{
+		readonly SwitchHandler.SwitchProxy _proxy;
+
+		public MauiUISwitch(RectangleF frame, SwitchHandler.SwitchProxy proxy) : base(frame)
+		{
+			_proxy = proxy;
+		}
+
+		public override void LayoutSubviews()
+		{
+			base.LayoutSubviews();
+			
+			// LayoutSubviews is called after the layout cycle completes
+			// This is the right place to update colors that depend on the final layout
+			if (OperatingSystem.IsIOSVersionAtLeast(26, 2) || OperatingSystem.IsMacCatalystVersionAtLeast(26, 2))
+			{
+				_proxy.UpdateThumbColorImmediately(this);
 			}
 		}
 	}
