@@ -10,6 +10,7 @@ namespace Microsoft.Maui.Handlers
 	{
 		readonly MauiPickerProxy _proxy = new();
 		UIPickerView? _pickerView;
+		UITapGestureRecognizer? _tapGestureRecognizer;
 
 #if MACCATALYST
 		UIAlertController? _pickerController;
@@ -269,6 +270,52 @@ namespace Microsoft.Maui.Handlers
 			textField.ResignFirstResponder();
 		}
 
+		void SetupTouchDismissGesture()
+		{
+			// Don't setup if window isn't available yet
+			if (PlatformView?.Window is null)
+			{
+    			return;
+			}
+
+			// Don't setup if already configured
+			if (_tapGestureRecognizer is not null)
+			{
+    			return;
+			}
+			var weakHandler = new WeakReference<PickerHandler>(this);
+			_tapGestureRecognizer = new UITapGestureRecognizer(() =>
+			{
+				if (weakHandler.TryGetTarget(out var handler))
+				{
+#if MACCATALYST
+					// On MacCatalyst, dismiss the UIAlertController
+					if (handler._pickerController is not null)
+					{
+						handler._pickerController.DismissViewController(true, null);
+						if (handler.VirtualView is IPicker virtualView)
+							virtualView.IsFocused = virtualView.IsOpen = false;
+					}
+#else
+					// On iOS, dismiss by ending editing
+					handler.PlatformView?.EndEditing(true);
+#endif
+				}
+			});
+			_tapGestureRecognizer.CancelsTouchesInView = false;
+			PlatformView.Window.AddGestureRecognizer(_tapGestureRecognizer);
+		}
+ 
+		void RemoveTouchDismissGesture()
+		{
+			if (_tapGestureRecognizer is not null && PlatformView?.Window is not null)
+			{
+				PlatformView.Window.RemoveGestureRecognizer(_tapGestureRecognizer);
+				_tapGestureRecognizer.Dispose();
+				_tapGestureRecognizer = null;
+			}
+		}
+
 		class MauiPickerProxy
 		{
 			WeakReference<PickerHandler>? _handler;
@@ -322,6 +369,7 @@ namespace Microsoft.Maui.Handlers
 				int selectedIndex = handler.VirtualView?.SelectedIndex ?? 0;
 				handler.DisplayAlert(handler.PlatformView, selectedIndex);
 #endif
+				Handler?.SetupTouchDismissGesture();
 			}
 
 			void OnEnded(object? sender, EventArgs eventArgs)
