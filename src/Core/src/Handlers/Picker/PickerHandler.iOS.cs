@@ -337,6 +337,7 @@ namespace Microsoft.Maui.Handlers
 
 			public void Disconnect(MauiPicker platformView)
 			{
+				Handler?.RemoveTouchDismissGesture();
 				platformView.EditingDidBegin -= OnStarted;
 				platformView.EditingDidEnd -= OnEnded;
 				platformView.EditingChanged -= OnEditing;
