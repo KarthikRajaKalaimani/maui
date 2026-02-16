@@ -288,23 +288,29 @@ namespace Microsoft.Maui.Handlers
 			{
 				if (weakHandler.TryGetTarget(out var handler))
 				{
-#if MACCATALYST
-					// On MacCatalyst, dismiss the UIAlertController
-					if (handler._pickerController is not null)
-					{
-						handler._pickerController.DismissViewController(true, null);
-						if (handler.VirtualView is IPicker virtualView)
-							virtualView.IsFocused = virtualView.IsOpen = false;
-					}
-#else
-					// On iOS, dismiss by ending editing
-					handler.PlatformView?.EndEditing(true);
-#endif
+					handler.DismissPicker();
 				}
 			});
 			_tapGestureRecognizer.CancelsTouchesInView = false;
 			PlatformView.Window.AddGestureRecognizer(_tapGestureRecognizer);
 		}
+
+		void DismissPicker()
+		{
+#if MACCATALYST
+			// On MacCatalyst, dismiss the UIAlertController
+			if (_pickerController is not null)
+			{
+				_pickerController.DismissViewController(true, null);
+				if (VirtualView is IPicker virtualView)
+					virtualView.IsFocused = virtualView.IsOpen = false;
+			}
+#else
+			// On iOS, dismiss by ending editing
+			PlatformView?.EndEditing(true);
+#endif
+		}
+ 
  
 		void RemoveTouchDismissGesture()
 		{
