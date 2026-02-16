@@ -381,6 +381,7 @@ namespace Microsoft.Maui.Handlers
 
 			void OnEnded(object? sender, EventArgs eventArgs)
 			{
+				Handler?.RemoveTouchDismissGesture();
 				if (Handler is not PickerHandler handler || handler._pickerView is not UIPickerView pickerView)
 					return;
 
