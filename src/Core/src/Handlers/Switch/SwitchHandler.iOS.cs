@@ -99,18 +99,13 @@ namespace Microsoft.Maui.Handlers
 						if (PlatformView is not null)
 						{
 							UpdateTrackOffColor(PlatformView);
+							
+							if (OperatingSystem.IsIOSVersionAtLeast(26, 2))
+							{
+								UpdateThumbColor(PlatformView);
+							}
 						}
 					});
-				_didBecomeActiveObserver = NSNotificationCenter.DefaultCenter.AddObserver(UIApplication.DidBecomeActiveNotification, _=>
-    			{
-     				if (PlatformView is not null)
-     				{
-      					if(OperatingSystem.IsIOSVersionAtLeast(26,2))
-      					{
-       						UpdateThumbColor(PlatformView); 
-      					}
-     				}
-   				});
 #endif
 			}
 
@@ -120,14 +115,11 @@ namespace Microsoft.Maui.Handlers
    			{
     			DispatchQueue.MainQueue.DispatchAsync(async () =>
     			{
-     				if (platformView.On)
-     				{
-      					await Task.Delay(10); // Small delay, necessary to allow UIKit to complete its internal layout and styling processes before re-applying the custom color
-						if (VirtualView is ISwitch view && view.ThumbColor is not null)
-      					{
-       						platformView.UpdateThumbColor(view);
-      					}
-     				}
+      				await Task.Delay(10); // Small delay, necessary to allow UIKit to complete its internal layout and styling processes before re-applying the custom color
+					if (VirtualView is ISwitch view && view.ThumbColor is not null)
+      				{
+       					platformView.UpdateThumbColor(view);
+					}
     			});
    			}
 
