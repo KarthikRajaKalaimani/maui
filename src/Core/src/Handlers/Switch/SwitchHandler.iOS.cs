@@ -70,7 +70,6 @@ namespace Microsoft.Maui.Handlers
 
 			NSObject? _willEnterForegroundObserver;
 			NSObject? _windowDidBecomeKeyObserver;
-			NSObject? _didBecomeActiveObserver;
 
 			public void Connect(ISwitch virtualView, UISwitch platformView)
 			{
@@ -155,11 +154,6 @@ namespace Microsoft.Maui.Handlers
 				{
 					NSNotificationCenter.DefaultCenter.RemoveObserver(_windowDidBecomeKeyObserver);
 					_windowDidBecomeKeyObserver = null;
-				}
-				if(_didBecomeActiveObserver is not null)
-				{
-					NSNotificationCenter.DefaultCenter.RemoveObserver(_didBecomeActiveObserver);
-					_didBecomeActiveObserver = null;
 				}
 			}
 
