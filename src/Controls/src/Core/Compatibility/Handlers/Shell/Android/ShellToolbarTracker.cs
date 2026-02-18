@@ -213,6 +213,15 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 			_globalLayoutListener = null;
 			_backButtonBehavior = null;
+
+			// Recycle the cached scaled bitmap during disposal
+			if (_backButtonIconDrawable is BitmapDrawable disposeBd
+				&& disposeBd.Bitmap is not null
+				&& !disposeBd.Bitmap.IsRecycled)
+			{
+				disposeBd.Bitmap.Recycle();
+			}
+
 			_backButtonIconSource = null;
 			_backButtonIconDrawable = null;
 			SearchHandler = null;
@@ -430,6 +439,10 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			if (TintColor != null)
 				tintColor = TintColor;
 
+			// Track old scaled bitmap so we can recycle it AFTER NavigationIcon
+			// is reassigned (recycling while still in use causes a crash).
+			Bitmap bitmapToRecycle = null;
+
 			if (image != null)
 			{
 				if (_flyoutBehavior == FlyoutBehavior.Flyout)
@@ -497,6 +510,11 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 							int sizePx = _drawerArrowDrawable.IntrinsicWidth;
 							var scaledBitmap = Bitmap.CreateScaledBitmap(
 								bitmapDrawable.Bitmap, sizePx, sizePx, true);
+							// CreateScaledBitmap returns the SAME Bitmap when dimensions already
+							// match. We must own a unique copy so that recycling an old cached
+							// bitmap doesn't destroy a shared/platform-cached bitmap still in use.
+							if (ReferenceEquals(scaledBitmap, bitmapDrawable.Bitmap))
+								scaledBitmap = bitmapDrawable.Bitmap.Copy(bitmapDrawable.Bitmap.GetConfig(), false);
 							// Set the bitmap density to match the display so BitmapDrawable
 							// doesn't rescale it again (it would interpret a raw bitmap as mdpi
 							// and scale up to the device density, doubling/tripling the size).
@@ -508,6 +526,10 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 							backButtonIconDrawable = rawDrawable;
 						}
 
+						// Mark the previous scaled bitmap for deferred recycling
+						if (_backButtonIconDrawable is BitmapDrawable oldCachedBd)
+							bitmapToRecycle = oldCachedBd.Bitmap;
+
 						_backButtonIconSource = image;
 						_backButtonIconDrawable = backButtonIconDrawable;
 					}
@@ -516,8 +538,11 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 			if (image == null && _backButtonIconDrawable != null)
 			{
-				// Icon override was removed; clear the cache so the old drawable
-				// isn't held in memory and won't be reused incorrectly.
+				// Icon override was removed; mark the old bitmap for deferred
+				// recycling and clear the cache.
+				if (_backButtonIconDrawable is BitmapDrawable clearedBd)
+					bitmapToRecycle = clearedBd.Bitmap;
+
 				_backButtonIconSource = null;
 				_backButtonIconDrawable = null;
 			}
@@ -585,6 +610,21 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				{
 					toolbar.NavigationIcon?.ClearColorFilter();
 				}
+			}
+
+			// Recycle the old bitmap only if it's a distinct object from the new one.
+			// Defer via Post() so the view system finishes any pending draw pass first.
+			var newBitmap = (backButtonIconDrawable as BitmapDrawable)?.Bitmap;
+			if (bitmapToRecycle is not null
+				&& !bitmapToRecycle.IsRecycled
+				&& !ReferenceEquals(bitmapToRecycle, newBitmap))
+			{
+				var bitmapRef = bitmapToRecycle;
+				toolbar.Post(() =>
+				{
+					if (!bitmapRef.IsRecycled)
+						bitmapRef.Recycle();
+				});
 			}
 		}
 
