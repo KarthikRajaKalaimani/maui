@@ -155,10 +155,16 @@ namespace Microsoft.Maui.Controls.Platform
 			var platformColor = navIconColor.ToPlatform();
 			if (nativeToolbar.NavigationIcon is Drawable navigationIcon)
 			{
+				// Only tint framework-managed navigation drawables (DrawerArrowDrawable
+				// and its subclass FlyoutIconDrawerDrawable). User-provided custom icons
+				// (BitmapDrawable, VectorDrawable via BackButtonBehavior.IconOverride)
+				// should preserve their original colors. Shell's toolbar tracker handles
+				// tinting those explicitly when Shell.ForegroundColor is set.
 				if (navigationIcon is DrawerArrowDrawable dad)
+				{
 					dad.Color = AGraphics.Color.White;
-
-				navigationIcon.SetColorFilter(platformColor, FilterMode.SrcAtop);
+					navigationIcon.SetColorFilter(platformColor, FilterMode.SrcAtop);
+				}
 			}
 
 			if (nativeToolbar.OverflowIcon is Drawable overflowIcon)

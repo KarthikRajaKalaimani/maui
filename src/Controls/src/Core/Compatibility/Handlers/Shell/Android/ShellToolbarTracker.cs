@@ -608,19 +608,19 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			UpdateToolbarIconAccessibilityText(toolbar, _shell);
 			_toolbar?.Handler?.UpdateValue(nameof(Toolbar.IconColor));
 
-			// When a custom back button icon is set via BackButtonBehavior.IconOverride
-			// and the user has NOT explicitly set Shell.ForegroundColor, clear the
-			// color filter so the icon renders with its original colors (matching
-			// iOS behavior where AlwaysOriginal is used when ForegroundColor is null).
-			// If ForegroundColor IS set, respect the user's intent and keep the tint.
+			// UpdateIconColor (called by the mapper above) now skips tinting for
+			// non-DrawerArrowDrawable navigation icons, so custom back button icons
+			// keep their original colors by default. When the user explicitly sets
+			// Shell.ForegroundColor, apply that tint here (matching iOS, which uses
+			// template rendering mode when ForegroundColor is set).
 			if (backButtonIconDrawable != null)
 			{
 				var foregroundColor = page?.GetValue(Shell.ForegroundColorProperty) ??
 					_shell?.GetValue(Shell.ForegroundColorProperty);
 
-				if (foregroundColor is null)
+				if (foregroundColor is Color fg)
 				{
-					toolbar.NavigationIcon?.ClearColorFilter();
+					toolbar.NavigationIcon?.SetColorFilter(fg.ToPlatform(), FilterMode.SrcAtop);
 				}
 			}
 
