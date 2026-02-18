@@ -214,12 +214,24 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			_globalLayoutListener = null;
 			_backButtonBehavior = null;
 
-			// Recycle the cached scaled bitmap during disposal
+			// Deferred bitmap recycling during disposal: clear NavigationIcon first
+			// so the toolbar drops the reference, then post the Recycle() to let any
+			// pending draw pass finish before the bitmap memory is released.
 			if (_backButtonIconDrawable is BitmapDrawable disposeBd
 				&& disposeBd.Bitmap is not null
 				&& !disposeBd.Bitmap.IsRecycled)
 			{
-				disposeBd.Bitmap.Recycle();
+				var bitmapRef = disposeBd.Bitmap;
+				if (_platformToolbar.IsAlive())
+				{
+					_platformToolbar.NavigationIcon = null;
+					_platformToolbar.Post(() =>
+					{
+						if (!bitmapRef.IsRecycled)
+							bitmapRef.Recycle();
+					});
+				}
+				// If toolbar is already dead, skip Recycle — GC will collect it.
 			}
 
 			_backButtonIconSource = null;
