@@ -68,6 +68,8 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 		GenericGlobalLayoutListener _globalLayoutListener;
 		DrawerArrowDrawable _drawerArrowDrawable;
 		FlyoutIconDrawerDrawable _flyoutIconDrawerDrawable;
+		ImageSource _backButtonIconSource;
+		Drawable _backButtonIconDrawable;
 		IToolbar _toolbar;
 		protected IMauiContext MauiContext => _shell.Handler.MauiContext;
 
@@ -211,6 +213,8 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 			_globalLayoutListener = null;
 			_backButtonBehavior = null;
+			_backButtonIconSource = null;
+			_backButtonIconDrawable = null;
 			SearchHandler = null;
 			ShellContext = null;
 			_drawerToggle = null;
@@ -412,11 +416,14 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			var command = backButtonHandler.GetPropertyIfSet<ICommand>(BackButtonBehavior.CommandProperty, null);
 			var backButtonVisibleFromBehavior = backButtonHandler.GetPropertyIfSet(BackButtonBehavior.IsVisibleProperty, true);
 			bool isEnabled = _shell.Toolbar.BackButtonEnabled;
-			//Add the FlyoutIcon only if the FlyoutBehavior is Flyout
-			var image = _flyoutBehavior == FlyoutBehavior.Flyout ? GetFlyoutIcon(backButtonHandler, page) : null;
+			// Always respect BackButtonBehavior.IconOverride; only fall back to FlyoutIcon when FlyoutBehavior is Flyout
+			var image = _flyoutBehavior == FlyoutBehavior.Flyout
+				? GetFlyoutIcon(backButtonHandler, page)
+				: backButtonHandler.GetPropertyIfSet<ImageSource>(BackButtonBehavior.IconOverrideProperty, null);
 			var backButtonVisible = _toolbar.BackButtonVisible;
 
 			DrawerArrowDrawable icon = null;
+			Drawable backButtonIconDrawable = null;
 			bool defaultDrawerArrowDrawable = false;
 
 			var tintColor = Colors.White;
@@ -425,40 +432,94 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 			if (image != null)
 			{
-				FlyoutIconDrawerDrawable fid = toolbar.NavigationIcon as FlyoutIconDrawerDrawable;
-				Drawable customIcon;
-
-				if (fid?.IconBitmapSource == image)
+				if (_flyoutBehavior == FlyoutBehavior.Flyout)
 				{
-					customIcon = fid.IconBitmap;
-				}
-				else
-				{
-					customIcon = (await image.GetPlatformImageAsync(MauiContext))?.Value;
+					// Flyout mode: wrap in FlyoutIconDrawerDrawable which applies toolbar tint color
+					FlyoutIconDrawerDrawable fid = toolbar.NavigationIcon as FlyoutIconDrawerDrawable;
+					Drawable customIcon;
 
-					// Fragment might have been disposed while we were waiting for the image drawable
-					if (_disposed)
+					if (fid?.IconBitmapSource == image)
 					{
-						return;
-					}
-				}
-
-				if (customIcon != null)
-				{
-					if (fid == null)
-					{
-						fid = new FlyoutIconDrawerDrawable(MauiContext.Context, tintColor, customIcon, text);
+						customIcon = fid.IconBitmap;
 					}
 					else
 					{
-						fid.TintColor = tintColor;
-						fid.IconBitmap = customIcon;
-						fid.Text = text;
+						customIcon = (await image.GetPlatformImageAsync(MauiContext))?.Value;
+
+						// Fragment might have been disposed while we were waiting for the image drawable
+						if (_disposed)
+						{
+							return;
+						}
 					}
 
-					fid.IconBitmapSource = image;
-					icon = fid;
+					if (customIcon != null)
+					{
+						if (fid == null)
+						{
+							fid = new FlyoutIconDrawerDrawable(MauiContext.Context, tintColor, customIcon, text);
+						}
+						else
+						{
+							fid.TintColor = tintColor;
+							fid.IconBitmap = customIcon;
+							fid.Text = text;
+						}
+
+						fid.IconBitmapSource = image;
+						icon = fid;
+					}
 				}
+				else
+				{
+					// Non-flyout mode (back button icon override): use the drawable directly without tinting.
+					// Cache the scaled drawable so repeated calls (navigation, property changes) skip
+					// the async image load and bitmap scaling when the ImageSource hasn't changed.
+					if (_backButtonIconSource == image && _backButtonIconDrawable != null)
+					{
+						backButtonIconDrawable = _backButtonIconDrawable;
+					}
+					else
+					{
+						var rawDrawable = (await image.GetPlatformImageAsync(MauiContext))?.Value;
+
+						// Fragment might have been disposed while we were waiting for the image drawable
+						if (_disposed)
+						{
+							return;
+						}
+
+						if (rawDrawable is BitmapDrawable bitmapDrawable)
+						{
+							// Scale the bitmap to match the default DrawerArrowDrawable size
+							// used by the toolbar for navigation icons.
+							_drawerArrowDrawable ??= new DrawerArrowDrawable(context.GetThemedContext());
+							int sizePx = _drawerArrowDrawable.IntrinsicWidth;
+							var scaledBitmap = Bitmap.CreateScaledBitmap(
+								bitmapDrawable.Bitmap, sizePx, sizePx, true);
+							// Set the bitmap density to match the display so BitmapDrawable
+							// doesn't rescale it again (it would interpret a raw bitmap as mdpi
+							// and scale up to the device density, doubling/tripling the size).
+							scaledBitmap.Density = (int)context.Resources.DisplayMetrics.DensityDpi;
+							backButtonIconDrawable = new BitmapDrawable(context.Resources, scaledBitmap);
+						}
+						else
+						{
+							backButtonIconDrawable = rawDrawable;
+						}
+
+						_backButtonIconSource = image;
+						_backButtonIconDrawable = backButtonIconDrawable;
+					}
+				}
+			}
+
+			if (image == null && _backButtonIconDrawable != null)
+			{
+				// Icon override was removed; clear the cache so the old drawable
+				// isn't held in memory and won't be reused incorrectly.
+				_backButtonIconSource = null;
+				_backButtonIconDrawable = null;
 			}
 
 			if (!string.IsNullOrWhiteSpace(text) && icon == null)
@@ -467,7 +528,7 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				icon = _flyoutIconDrawerDrawable;
 			}
 
-			if (icon == null && (_flyoutBehavior == FlyoutBehavior.Flyout || CanNavigateBack))
+			if (icon == null && backButtonIconDrawable == null && (_flyoutBehavior == FlyoutBehavior.Flyout || CanNavigateBack))
 			{
 				_drawerArrowDrawable ??= new DrawerArrowDrawable(context.GetThemedContext());
 				icon = _drawerArrowDrawable;
@@ -481,7 +542,9 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				_drawerToggle.DrawerIndicatorEnabled = false;
 
 				if (backButtonVisibleFromBehavior && (backButtonVisible || !defaultDrawerArrowDrawable))
-					toolbar.NavigationIcon = icon;
+				{
+					toolbar.NavigationIcon = backButtonIconDrawable ?? icon;
+				}
 			}
 			else if (_flyoutBehavior == FlyoutBehavior.Flyout || !defaultDrawerArrowDrawable)
 			{
@@ -493,7 +556,7 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				}
 				else
 				{
-					toolbar.NavigationIcon = icon;
+					toolbar.NavigationIcon = backButtonIconDrawable ?? icon;
 				}
 			}
 			else
@@ -507,6 +570,14 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			//this needs to be set after SyncState
 			UpdateToolbarIconAccessibilityText(toolbar, _shell);
 			_toolbar?.Handler?.UpdateValue(nameof(Toolbar.IconColor));
+
+			// When a custom back button icon is set via BackButtonBehavior.IconOverride,
+			// clear any color filter applied by UpdateIconColor so the icon renders
+			// with its original colors instead of being tinted.
+			if (backButtonIconDrawable != null)
+			{
+				toolbar.NavigationIcon?.ClearColorFilter();
+			}
 		}
 
 
