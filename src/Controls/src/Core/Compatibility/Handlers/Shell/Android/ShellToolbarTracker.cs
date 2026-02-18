@@ -214,10 +214,6 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			_globalLayoutListener = null;
 			_backButtonBehavior = null;
 			_backButtonIconSource = null;
-			if (_backButtonIconDrawable is BitmapDrawable oldBd && oldBd.Bitmap is Bitmap oldBmp && !oldBmp.IsRecycled)
-			{
-				oldBmp.Recycle();
-			}
 			_backButtonIconDrawable = null;
 			SearchHandler = null;
 			ShellContext = null;
@@ -512,12 +508,6 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 							backButtonIconDrawable = rawDrawable;
 						}
 
-						// Recycle the previously cached scaled bitmap before replacing it
-						if (_backButtonIconDrawable is BitmapDrawable oldBd && oldBd.Bitmap is Bitmap oldBmp && !oldBmp.IsRecycled)
-						{
-							oldBmp.Recycle();
-						}
-
 						_backButtonIconSource = image;
 						_backButtonIconDrawable = backButtonIconDrawable;
 					}
@@ -526,13 +516,8 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 			if (image == null && _backButtonIconDrawable != null)
 			{
-				// Icon override was removed; recycle the scaled bitmap and clear the
-				// cache so the old drawable isn't held in memory.
-				if (_backButtonIconDrawable is BitmapDrawable oldBd && oldBd.Bitmap is Bitmap oldBmp && !oldBmp.IsRecycled)
-				{
-					oldBmp.Recycle();
-				}
-
+				// Icon override was removed; clear the cache so the old drawable
+				// isn't held in memory and won't be reused incorrectly.
 				_backButtonIconSource = null;
 				_backButtonIconDrawable = null;
 			}
@@ -586,12 +571,20 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			UpdateToolbarIconAccessibilityText(toolbar, _shell);
 			_toolbar?.Handler?.UpdateValue(nameof(Toolbar.IconColor));
 
-			// When a custom back button icon is set via BackButtonBehavior.IconOverride,
-			// clear any color filter applied by UpdateIconColor so the icon renders
-			// with its original colors instead of being tinted.
+			// When a custom back button icon is set via BackButtonBehavior.IconOverride
+			// and the user has NOT explicitly set Shell.ForegroundColor, clear the
+			// color filter so the icon renders with its original colors (matching
+			// iOS behavior where AlwaysOriginal is used when ForegroundColor is null).
+			// If ForegroundColor IS set, respect the user's intent and keep the tint.
 			if (backButtonIconDrawable != null)
 			{
-				toolbar.NavigationIcon?.ClearColorFilter();
+				var foregroundColor = page?.GetValue(Shell.ForegroundColorProperty) ??
+					_shell?.GetValue(Shell.ForegroundColorProperty);
+
+				if (foregroundColor is null)
+				{
+					toolbar.NavigationIcon?.ClearColorFilter();
+				}
 			}
 		}
 
