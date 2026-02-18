@@ -28,7 +28,7 @@ namespace Microsoft.Maui.Handlers
 		{
 			base.ConnectHandler(platformView);
 			_proxy.Connect(VirtualView, platformView);
-    		_proxy.UpdateThumbColor(platformView);
+			_proxy.UpdateThumbColor(platformView);
 		}
 
 		protected override void DisconnectHandler(UISwitch platformView)
@@ -85,9 +85,9 @@ namespace Microsoft.Maui.Handlers
 						{
 							UpdateTrackOffColor(PlatformView);
 							
-							if(OperatingSystem.IsMacCatalystVersionAtLeast(26,2))
+							if (OperatingSystem.IsMacCatalystVersionAtLeast(26, 2))
 							{
- 								UpdateThumbColor(PlatformView); 
+								UpdateThumbColor(PlatformView);
 							}
 						}
 					});
@@ -109,18 +109,18 @@ namespace Microsoft.Maui.Handlers
 			}
 
 			// Ensures the Switch thumb color is updated correctly after system-level UI resets.
-			// This is necessary because UIKit may re-apply default styles to internal views after intial loading in iOS 26.2 and Mac Catalyst 26.2,
-			public void UpdateThumbColor(UISwitch platformView)
-   			{
-    			DispatchQueue.MainQueue.DispatchAsync(async () =>
-    			{
-      				await Task.Delay(10); // Small delay, necessary to allow UIKit to complete its internal layout and styling processes before re-applying the custom color
+			// This is necessary because UIKit may re-apply default styles to internal views after initial loading in iOS 26.2 and Mac Catalyst 26.2.
+			internal void UpdateThumbColor(UISwitch platformView)
+			{
+				DispatchQueue.MainQueue.DispatchAsync(async () =>
+				{
+					await Task.Delay(10); // Small delay to allow UIKit to complete its internal layout and styling processes before re-applying the custom color
 					if (VirtualView is ISwitch view && view.ThumbColor is not null)
-      				{
-       					platformView.UpdateThumbColor(view);
+					{
+						platformView.UpdateThumbColor(view);
 					}
-    			});
-   			}
+				});
+			}
 
 			// Ensures the Switch track "OFF" color is updated correctly after system-level UI resets.
 			// This is necessary because UIKit may re-apply default styles to internal views during certain lifecycle events,
