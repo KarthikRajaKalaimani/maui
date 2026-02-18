@@ -214,6 +214,10 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			_globalLayoutListener = null;
 			_backButtonBehavior = null;
 			_backButtonIconSource = null;
+			if (_backButtonIconDrawable is BitmapDrawable oldBd && oldBd.Bitmap is Bitmap oldBmp && !oldBmp.IsRecycled)
+			{
+				oldBmp.Recycle();
+			}
 			_backButtonIconDrawable = null;
 			SearchHandler = null;
 			ShellContext = null;
@@ -508,6 +512,12 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 							backButtonIconDrawable = rawDrawable;
 						}
 
+						// Recycle the previously cached scaled bitmap before replacing it
+						if (_backButtonIconDrawable is BitmapDrawable oldBd && oldBd.Bitmap is Bitmap oldBmp && !oldBmp.IsRecycled)
+						{
+							oldBmp.Recycle();
+						}
+
 						_backButtonIconSource = image;
 						_backButtonIconDrawable = backButtonIconDrawable;
 					}
@@ -516,8 +526,13 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 			if (image == null && _backButtonIconDrawable != null)
 			{
-				// Icon override was removed; clear the cache so the old drawable
-				// isn't held in memory and won't be reused incorrectly.
+				// Icon override was removed; recycle the scaled bitmap and clear the
+				// cache so the old drawable isn't held in memory.
+				if (_backButtonIconDrawable is BitmapDrawable oldBd && oldBd.Bitmap is Bitmap oldBmp && !oldBmp.IsRecycled)
+				{
+					oldBmp.Recycle();
+				}
+
 				_backButtonIconSource = null;
 				_backButtonIconDrawable = null;
 			}
