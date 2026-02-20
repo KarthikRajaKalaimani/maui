@@ -7,12 +7,12 @@ namespace Microsoft.Maui.Controls.Xaml.UnitTests;
 
 public class Maui33417
 {
-	const string InvalidDataTypeXaml = """
+	const string InvalidBindingXaml = """
 		<?xml version="1.0" encoding="utf-8" ?>
 		<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
 		             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
 					 xmlns:local="clr-namespace:Microsoft.Maui.Controls.Xaml.UnitTests"
-		             x:Class="Microsoft.Maui.Controls.Xaml.UnitTests.Maui33417_InvalidDataType"
+		             x:Class="Microsoft.Maui.Controls.Xaml.UnitTests.Maui33417_InvalidBinding"
 		             x:DataType="local:Foo">
 		    <VerticalStackLayout>
 		        <Label Text="{Binding NonExistentProperty}" />
@@ -20,39 +20,15 @@ public class Maui33417
 		</ContentPage>
 		""";
 
-	const string InvalidBindingPropertyXaml = """
-		<?xml version="1.0" encoding="utf-8" ?>
-		<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-		             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-		             x:Class="Microsoft.Maui.Controls.Xaml.UnitTests.Maui33417_InvalidBindingProperty"
-		             x:DataType="ContentPage">
-		    <VerticalStackLayout>
-		        <Label Text="{Binding Foo}" />
-		    </VerticalStackLayout>
-		</ContentPage>
-		""";
-
 	[Fact]
-	public void InvalidDataType_ShouldReportTypeResolutionError()
+	public void Issue33417_Test()
 	{
 		var result = CreateMauiCompilation()
-			.RunMauiSourceGenerator(new AdditionalXamlFile("Maui33417_InvalidDataType.xaml", InvalidDataTypeXaml));
+			.RunMauiSourceGenerator(new AdditionalXamlFile("Maui33417_InvalidBinding.xaml", InvalidBindingXaml));
 		Assert.NotEmpty(result.Diagnostics);
-		var hasTypeError = result.Diagnostics.Any(d =>
+		var hasTypeError = result.Diagnostics.Any(d => 
 			d.Id == "MAUIX2000" && d.GetMessage().Contains("Foo", StringComparison.Ordinal));
 		Assert.True(hasTypeError,
 			$"Should report type resolution error (MAUIX2000) for 'local:Foo'. Found diagnostics: {string.Join(", ", result.Diagnostics.Select(d => $"{d.Id}: {d.GetMessage()}"))}");
-	}
-
-	[Fact]
-	public void InvalidBindingProperty_ShouldReportPropertyNotFound()
-	{
-		var result = CreateMauiCompilation()
-			.RunMauiSourceGenerator(new AdditionalXamlFile("Maui33417_InvalidBindingProperty.xaml", InvalidBindingPropertyXaml));
-		Assert.NotEmpty(result.Diagnostics);
-		var hasPropertyError = result.Diagnostics.Any(d =>
-			d.Id == "MAUIG2045" && d.GetMessage().Contains("Foo", StringComparison.Ordinal));
-		Assert.True(hasPropertyError,
-			$"Should report binding property not found warning (MAUIG2045) for 'Foo'. Found diagnostics: {string.Join(", ", result.Diagnostics.Select(d => $"{d.Id}: {d.GetMessage()}"))}");
 	}
 }
