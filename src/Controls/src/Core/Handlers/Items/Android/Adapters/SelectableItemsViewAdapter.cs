@@ -13,6 +13,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 	{
 		List<SelectableViewHolder> _currentViewHolders = new List<SelectableViewHolder>();
 		HashSet<object> _selectedSet = new HashSet<object>();
+		int _selectedAdapterPosition = -1;
 
 		protected internal SelectableItemsViewAdapter(TItemsView selectableItemsView,
 			Func<View, Context, ItemContentView> createView = null) : base(selectableItemsView, createView)
@@ -77,17 +78,25 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 					var selectedItem = selectableItemsView.SelectedItem;
 					if (selectedItem == null)
 					{
+						_selectedAdapterPosition = -1;
 						ClearPlatformSelection();
 						return;
 					}
 
-					var selectedPosition = GetPositionForItem(selectedItem);  // first match position
-    				for (int i = 0; i < _currentViewHolders.Count; i++)
+					// Prefer the tracked adapter position from the last tap (handles duplicate-value items).
+					// Fall back to value-based lookup for programmatic SelectedItem changes.
+					var selectedPosition = (_selectedAdapterPosition >= 0
+						&& _selectedAdapterPosition < ItemsSource.Count
+						&& ItemsSource.GetItem(_selectedAdapterPosition)?.Equals(selectedItem) == true)
+						? _selectedAdapterPosition
+						: GetPositionForItem(selectedItem);
+
+					for (int i = 0; i < _currentViewHolders.Count; i++)
 					{
 						var holder = _currentViewHolders[i];
-						bool shouldBeSelected = holder.BindingAdapterPosition == selectedPosition;  // position-based
+						bool shouldBeSelected = holder.BindingAdapterPosition == selectedPosition;
 						if (holder.IsSelected != shouldBeSelected)
-						{ 
+						{
 							holder.IsSelected = shouldBeSelected;
 						}
 					}
@@ -187,6 +196,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 					// Selection's not even on, so there's nothing to do here
 					return;
 				case SelectionMode.Single:
+					_selectedAdapterPosition = adapterPosition;
 					var previouslySelectedItem = ItemsView.SelectedItem;
 					ItemsView.SelectedItem = ItemsSource.GetItem(adapterPosition);
 					if (previouslySelectedItem == ItemsView.SelectedItem && ItemsView.SelectedItem is not null)
