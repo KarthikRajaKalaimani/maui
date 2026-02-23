@@ -16,8 +16,19 @@ public class Issue20062 : _IssuesUITest
 	public void CollectionViewSelectionChangesVisualState()
 	{
 		App.WaitForElement("CollectionView");
-		App.Tap("FirstItem");
-		App.Tap("ThirdItem");
+		var items = App.FindElementsByText("a");
+		items.ElementAt(0).Tap();  // Tap first item (index 0)
+		items.ElementAt(2).Tap();  // Tap third item (index 2)
+		VerifyScreenshot();
+	}
+
+	[Test]
+	[Category(UITestCategories.CollectionView)]
+	public void ShouldNotSelectAllItemsWhenClickFirstItem()
+	{
+		App.WaitForElement("CollectionView");
+		var items = App.FindElementsByText("a");
+		items.ElementAt(0).Tap(); 
 		VerifyScreenshot();
 	}
 }

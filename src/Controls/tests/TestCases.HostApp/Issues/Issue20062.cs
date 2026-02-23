@@ -7,12 +7,13 @@ namespace Maui.Controls.Sample.Issues;
 public class Issue20062 : TestContentPage
 {
 	CollectionView collection;
-	Issue20062ViewModel viewModel;
+	List<string>  list = new List<string>();
 	protected override void Init()
 	{
-
+			
 		collection = new CollectionView
 		{
+			HeightRequest = 520,
 			SelectionMode = SelectionMode.Single,
 			ItemsLayout = new GridItemsLayout(2, ItemsLayoutOrientation.Vertical)
 			{
@@ -33,14 +34,13 @@ public class Issue20062 : TestContentPage
 				var label = new Label
 				{
 					FontFamily = "SemiBold",
+					Text="a",
 					TextColor = Colors.Black,
 					FontSize = 14,
 					HorizontalOptions = LayoutOptions.Center,
 					HorizontalTextAlignment = TextAlignment.Center,
 					VerticalOptions = LayoutOptions.Center
 				};
-				label.SetBinding(Label.TextProperty, "Name");
-				label.SetBinding(Label.AutomationIdProperty, "Id");
 
 				var grid = new Grid
 				{
@@ -86,8 +86,12 @@ public class Issue20062 : TestContentPage
 			Spacing = 25,
 			Children = { collection }
 		};
-		BindingContext = viewModel = new Issue20062ViewModel();
-		collection.ItemsSource = viewModel.Items;
+
+		list.Add("a");
+        list.Add("a");
+        list.Add("a");
+        list.Add("a");
+        collection.ItemsSource = list;
 
 		Content = new ScrollView
 		{
@@ -96,26 +100,3 @@ public class Issue20062 : TestContentPage
 
 	}
 }
-
-public class Issue20062_Item
-{
-	public string Name { get; set; }
-	public string Id { get; set; }
-}
-
-public class Issue20062ViewModel
-{
-	public List<Issue20062_Item> Items { get; set; }
-
-	public Issue20062ViewModel()
-	{
-		Items = new List<Issue20062_Item>
-		{
-			new Issue20062_Item { Name = "a", Id = "FirstItem" },
-			new Issue20062_Item { Name = "a", Id = "SecondItem" },
-			new Issue20062_Item { Name = "a", Id = "ThirdItem" },
-			new Issue20062_Item { Name = "a", Id = "FourthItem" }
-		};
-	}
-}
-

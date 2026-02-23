@@ -81,8 +81,17 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 						return;
 					}
 
-					_selectedSet.Add(selectedItem);
-					break;
+					var selectedPosition = GetPositionForItem(selectedItem);  // first match position
+    				for (int i = 0; i < _currentViewHolders.Count; i++)
+					{
+						var holder = _currentViewHolders[i];
+						bool shouldBeSelected = holder.BindingAdapterPosition == selectedPosition;  // position-based
+						if (holder.IsSelected != shouldBeSelected)
+						{ 
+							holder.IsSelected = shouldBeSelected;
+						}
+					}
+					return;
 
 				case SelectionMode.Multiple:
 					var selectedItems = selectableItemsView.SelectedItems;
@@ -182,9 +191,15 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 					ItemsView.SelectedItem = ItemsSource.GetItem(adapterPosition);
 					if (previouslySelectedItem == ItemsView.SelectedItem && ItemsView.SelectedItem is not null)
 					{
-						var viewHolderIndex = ItemsSource.HasHeader ? adapterPosition - 1 : adapterPosition;
 						ClearPlatformSelection();
-						_currentViewHolders[viewHolderIndex].IsSelected = true;
+						for (int i = 0; i < _currentViewHolders.Count; i++)
+						{
+							if (_currentViewHolders[i].BindingAdapterPosition == adapterPosition)
+							{
+								_currentViewHolders[i].IsSelected = true;
+								break;
+							}
+						}
 					}
 					return;
 				case SelectionMode.Multiple:
