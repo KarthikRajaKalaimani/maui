@@ -112,8 +112,6 @@ namespace Microsoft.Maui.Handlers
 						.FireAndForget();
 				}
 			});
-
-			SetupTouchDismissGesture();
 		}
 
 		static UIViewController? GetCurrentViewController(UIViewController? viewController)
@@ -301,13 +299,15 @@ namespace Microsoft.Maui.Handlers
 		void DismissPicker()
 		{
 #if MACCATALYST
-			// On MacCatalyst, dismiss the UIAlertController
+			// On MacCatalyst, dismiss the UIAlertController and clean up the tap gesture directly,
+			// since ResignFirstResponder is not called here and OnEnded will not fire.
 			if (_pickerController is not null)
 			{
 				_pickerController.DismissViewController(true, null);
 				if (VirtualView is IPicker virtualView)
 					virtualView.IsFocused = virtualView.IsOpen = false;
 			}
+			RemoveTouchDismissGesture();
 #else
 			// On iOS, dismiss by ending editing
 			PlatformView?.EndEditing(true);
@@ -318,9 +318,9 @@ namespace Microsoft.Maui.Handlers
 
 		void RemoveTouchDismissGesture()
 		{
-			if (_tapGestureRecognizer is not null && PlatformView?.Window is not null)
+			if (_tapGestureRecognizer is not null)
 			{
-				PlatformView.Window.RemoveGestureRecognizer(_tapGestureRecognizer);
+				_tapGestureRecognizer.View?.RemoveGestureRecognizer(_tapGestureRecognizer);
 				_tapGestureRecognizer.Dispose();
 				_tapGestureRecognizer = null;
 			}
@@ -342,7 +342,6 @@ namespace Microsoft.Maui.Handlers
 
 				platformView.EditingDidBegin += OnStarted;
 				platformView.EditingDidEnd += OnEnded;
-				Handler?.SetupTouchDismissGesture();
 				platformView.EditingChanged += OnEditing;
 			}
 
