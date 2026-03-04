@@ -70,6 +70,24 @@ Task("connectToDevice")
 		}
 		else if (testDevice.IndexOf("_") != -1)
 		{
+			// Detect if the requested iOS simulator version is compatible with the installed Xcode.
+			// Xcode 26+ only ships with iOS 26+ runtimes; iOS 18.x requires Xcode 16.x.
+			// If incompatible, substitute the device target with the available iOS 26.0 version
+			// so that all subsequent steps (simulator install, app install, test run) use the
+			// correct runtime that was provisioned for this machine.
+			var compatibleDevice = GetCompatibleSimulatorDevice(testDevice);
+			if (compatibleDevice != testDevice)
+			{
+				Warning($"Requested device '{testDevice}' is not compatible with the installed Xcode version.");
+				Warning($"Substituting with '{compatibleDevice}' for this run.");
+				testDevice = compatibleDevice;
+
+				// Keep iosVersion in sync with the substituted device (extract from "ios-simulator-64_26.0" → "26.0")
+				var versionMatch = System.Text.RegularExpressions.Regex.Match(compatibleDevice, @"_(\d+\.\d+)$");
+				if (versionMatch.Success)
+					iosVersion = versionMatch.Groups[1].Value;
+			}
+
 			GetSimulators(testDevice, dotnetToolPath);
 			ResetSimulators(testDevice, dotnetToolPath);
 		}
@@ -594,4 +612,99 @@ void GetDevices(string version, string tool)
 	{
 		throw new Exception($"No devices found for version {version}");
 	}
+}
+
+/// <summary>
+/// Returns the currently selected Xcode major version by running `xcodebuild -version`.
+/// Returns 0 if the version cannot be determined.
+/// </summary>
+int GetXcodeMajorVersion()
+{
+	var major = 0;
+	try
+	{
+		var outputLines = new System.Collections.Generic.List<string>();
+		StartProcess("xcodebuild", new ProcessSettings
+		{
+			Arguments = "-version",
+			SetupProcessSettings = p =>
+			{
+				p.RedirectStandardOutput = true;
+				p.RedirectedStandardOutputHandler = line =>
+				{
+					if (line != null)
+						outputLines.Add(line);
+					return line;
+				};
+			}
+		});
+
+		// Output is typically:
+		//   Xcode 26.0.1
+		//   Build version 26A5306g
+		foreach (var line in outputLines)
+		{
+			var trimmed = line.Trim();
+			if (trimmed.StartsWith("Xcode ", StringComparison.OrdinalIgnoreCase))
+			{
+				var versionStr = trimmed.Substring("Xcode ".Length).Trim();
+				var parts = versionStr.Split('.');
+				if (parts.Length > 0 && int.TryParse(parts[0], out var parsed))
+				{
+					major = parsed;
+					Information($"Detected Xcode major version: {major}");
+					break;
+				}
+			}
+		}
+	}
+	catch (Exception ex)
+	{
+		Warning($"Could not determine Xcode version: {ex.Message}");
+	}
+	return major;
+}
+
+/// <summary>
+/// Checks whether the given simulator device target is compatible with the installed Xcode version.
+/// If the iOS version encoded in <paramref name="requestedDevice"/> is not supported by the current
+/// Xcode (e.g., requesting iOS 18.4 on Xcode 26), returns a compatible substitute device string.
+/// Otherwise returns the original value unchanged.
+///
+/// Xcode major version / iOS compatibility:
+///   Xcode 16.x → iOS 18.x
+///   Xcode 26.x → iOS 26.x  (Apple renumbered the OS alongside Xcode in 2025)
+/// </summary>
+string GetCompatibleSimulatorDevice(string requestedDevice)
+{
+	// Parse the iOS version from a target string like "ios-simulator-64_18.4"
+	var match = System.Text.RegularExpressions.Regex.Match(
+		requestedDevice, @"^(.+)_(\d+)\.(\d+)$");
+
+	if (!match.Success)
+		return requestedDevice;
+
+	var deviceBase     = match.Groups[1].Value;   // e.g. "ios-simulator-64"
+	var requestedMajor = int.Parse(match.Groups[2].Value);
+	var requestedMinor = match.Groups[3].Value;
+
+	var xcodeMajor = GetXcodeMajorVersion();
+	if (xcodeMajor == 0)
+	{
+		// Could not detect Xcode version; return the original and let it fail naturally.
+		Warning("Could not detect installed Xcode version; proceeding with requested device as-is.");
+		return requestedDevice;
+	}
+
+	// Xcode 26+ only supports iOS 26+; older iOS runtimes are not available in Xcode 26.
+	if (xcodeMajor >= 26 && requestedMajor < 26)
+	{
+		var substitute = $"{deviceBase}_26.0";
+		Information($"Xcode {xcodeMajor} does not supply iOS {requestedMajor}.{requestedMinor} simulator runtimes.");
+		Information($"The provisioning step installed iOS 26.0 for this Xcode version.");
+		Information($"Substituting '{requestedDevice}' → '{substitute}'.");
+		return substitute;
+	}
+
+	return requestedDevice;
 }
