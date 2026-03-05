@@ -211,8 +211,51 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 
 		internal void UpdateScrollingConstraints()
 		{
-			CollectionView.AlwaysBounceVertical = !IsHorizontal;
-			CollectionView.AlwaysBounceHorizontal = IsHorizontal;
+			if (IsHorizontal && OperatingSystem.IsMacCatalyst())
+			{
+				// Mac Catalyst: the outer UICollectionView is configured as horizontal (direct scroll).
+				// Page snapping is handled by MacCatalystHorizontalCarouselLayout.TargetContentOffset,
+				// so we do NOT set PagingEnabled = true here (PagingEnabled suppresses the horizontal
+				// scroll indicator on Mac Catalyst where UIScrollView is backed by NSScrollView).
+				CollectionView.PagingEnabled = false;
+				CollectionView.AlwaysBounceHorizontal = true;
+				CollectionView.AlwaysBounceVertical = false;
+			}
+			else
+			{
+				// iOS / vertical carousel: outer UICollectionView uses a vertical scroll direction.
+				// For horizontal iOS carousel, the inner orthogonal section (GroupPagingCentered) handles
+				// horizontal paging. AlwaysBounceHorizontal must be false so the outer vertical
+				// UICollectionView does NOT intercept horizontal gestures before they reach the inner
+				// orthogonal UIScrollView.
+				CollectionView.PagingEnabled = false;
+				CollectionView.AlwaysBounceVertical = !IsHorizontal;
+				CollectionView.AlwaysBounceHorizontal = false;
+			}
+		}
+
+		/// <summary>
+		/// Updates the carousel position based on the outer UICollectionView's current content offset.
+		/// Used on Mac Catalyst where the outer UICollectionView directly handles horizontal scrolling
+		/// (instead of the iOS path that uses VisibleItemsInvalidationHandler on an orthogonal section).
+		/// Called from CarouselViewDelegator2 when deceleration or a scroll animation ends.
+		/// </summary>
+		internal void UpdatePositionFromDirectScroll(CoreGraphics.CGPoint contentOffset)
+		{
+			if (!IsHorizontal || !OperatingSystem.IsMacCatalyst())
+				return;
+			if (!InitialPositionSet)
+				return;
+			if (ItemsSource is null || ItemsSource.ItemCount == 0)
+				return;
+
+			var boundsWidth = CollectionView.Bounds.Width;
+			if (boundsWidth <= 0)
+				return;
+
+			var pageIndex = (int)Math.Round(contentOffset.X / boundsWidth);
+			pageIndex = Math.Max(0, Math.Min(pageIndex, ItemsSource.ItemCount - 1));
+			SetPosition(pageIndex);
 		}
 
 		void Setup(CarouselView carouselView)

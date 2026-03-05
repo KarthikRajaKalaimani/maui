@@ -22,11 +22,13 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 		public override void ScrollAnimationEnded(UIScrollView scrollView)
 		{
 			ViewController?.UpdateIsScrolling(false);
+			ViewController?.UpdatePositionFromDirectScroll(scrollView.ContentOffset);
 		}
 
 		public override void DecelerationEnded(UIScrollView scrollView)
 		{
 			ViewController?.UpdateIsScrolling(false);
+			ViewController?.UpdatePositionFromDirectScroll(scrollView.ContentOffset);
 		}
 
 		public override void DraggingStarted(UIScrollView scrollView)
@@ -43,6 +45,10 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			PreviousVerticalOffset = 0;
 
 			ViewController?.DraggingEnded(scrollView, willDecelerate);
+
+			// For slow drags that don't trigger deceleration, update position immediately.
+			if (!willDecelerate)
+				ViewController?.UpdatePositionFromDirectScroll(scrollView.ContentOffset);
 		}
 
 		protected override (bool VisibleItems, int First, int Center, int Last) GetVisibleItemsIndex()

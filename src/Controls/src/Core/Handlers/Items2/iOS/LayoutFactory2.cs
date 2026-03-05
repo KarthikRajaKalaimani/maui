@@ -280,7 +280,11 @@ internal static class LayoutFactory2
 		NSCollectionLayoutDimension groupHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1);
 		NSCollectionLayoutGroup group = null;
 
-		var layout = new UICollectionViewCompositionalLayout((sectionIndex, environment) =>
+		weakItemsView.TryGetTarget(out var initialItemsView);
+		bool isMacCatalystDirectHorizontal = OperatingSystem.IsMacCatalyst() &&
+			initialItemsView?.ItemsLayout?.Orientation == ItemsLayoutOrientation.Horizontal;
+
+		UICollectionViewCompositionalLayoutSectionProvider sectionProvider = (sectionIndex, environment) =>
 		{
 			if (!weakItemsView.TryGetTarget(out var itemsView))
 			{
@@ -334,10 +338,12 @@ internal static class LayoutFactory2
 			{
 				section.InterGroupSpacing = (nfloat)linearItemsLayout.ItemSpacing;
 			}
-			section.OrthogonalScrollingBehavior = isHorizontal
+			section.OrthogonalScrollingBehavior = (isHorizontal && !isMacCatalystDirectHorizontal)
 				? UICollectionLayoutSectionOrthogonalScrollingBehavior.GroupPagingCentered
 				: UICollectionLayoutSectionOrthogonalScrollingBehavior.None;
 
+			if (!isMacCatalystDirectHorizontal)
+			{
 			section.VisibleItemsInvalidationHandler = (items, offset, env) =>
 			{
 				if (!weakItemsView.TryGetTarget(out var itemsView) || !weakController.TryGetTarget(out var cv2Controller))
@@ -347,12 +353,12 @@ internal static class LayoutFactory2
 
 				var page = (offset.X + sectionMargin) / (env.Container.ContentSize.Width - sectionMargin * 2);
 
-				if (Math.Abs(page % 1) > (double.Epsilon * 100) || cv2Controller.ItemsSource.ItemCount <= 0)
+				var pageIndex = (int)Math.Round(page);
+				if (cv2Controller.ItemsSource.ItemCount <= 0 || Math.Abs(page - pageIndex) > 0.01)
 				{
 					return;
 				}
 
-				var pageIndex = (int)page;
 				var carouselPosition = pageIndex;
 
 				if (itemsView.Loop && cv2Controller.ItemsSource is ILoopItemsViewSource loopSource)
@@ -405,11 +411,19 @@ internal static class LayoutFactory2
 				//Update the CarouselView position
 				cv2Controller?.SetPosition(carouselPosition);
 			};
+			}
 
 			return section;
-		});
+		};
 
-		return layout;
+		if (isMacCatalystDirectHorizontal)
+		{
+			var config = new UICollectionViewCompositionalLayoutConfiguration();
+			config.ScrollDirection = UICollectionViewScrollDirection.Horizontal;
+			return new MacCatalystHorizontalCarouselLayout(sectionProvider, config);
+		}
+
+		return new UICollectionViewCompositionalLayout(sectionProvider);
 	}
 #nullable enable
 
@@ -594,6 +608,40 @@ internal static class LayoutFactory2
 
 			return Items.SnapHelpers.AdjustContentOffset(CollectionView.ContentOffset, currentItem.Frame, viewport, alignment,
 				Configuration.ScrollDirection);
+		}
+	}
+
+	class MacCatalystHorizontalCarouselLayout : UICollectionViewCompositionalLayout
+	{
+		public MacCatalystHorizontalCarouselLayout(
+			UICollectionViewCompositionalLayoutSectionProvider sectionProvider,
+			UICollectionViewCompositionalLayoutConfiguration configuration)
+			: base(sectionProvider, configuration)
+		{
+		}
+
+		public override CGPoint TargetContentOffset(CGPoint proposedContentOffset, CGPoint scrollingVelocity)
+		{
+			var pageWidth = CollectionView?.Bounds.Width ?? 0;
+			if (pageWidth <= 0)
+				return base.TargetContentOffset(proposedContentOffset, scrollingVelocity);
+
+			var currentOffsetX = CollectionView?.ContentOffset.X ?? 0;
+			var currentPage = currentOffsetX / pageWidth;
+
+			nfloat targetPage;
+			if (scrollingVelocity.X > 0.1)
+				targetPage = (nfloat)Math.Ceiling(currentPage);
+			else if (scrollingVelocity.X < -0.1)
+				targetPage = (nfloat)Math.Floor(currentPage);
+			else
+				targetPage = (nfloat)Math.Round(currentPage);
+
+			var itemCount = CollectionView != null ? (int)CollectionView.NumberOfItemsInSection(0) : 1;
+			itemCount = Math.Max(1, itemCount);
+			targetPage = (nfloat)Math.Max(0, Math.Min((double)targetPage, itemCount - 1));
+
+			return new CGPoint(targetPage * pageWidth, proposedContentOffset.Y);
 		}
 	}
 
