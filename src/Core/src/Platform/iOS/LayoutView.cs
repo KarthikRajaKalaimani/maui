@@ -72,15 +72,34 @@ namespace Microsoft.Maui.Platform
 			return result;
 		}
 
-		// Searches the subview's own children for a hit, converting touch coordinates
-		// directly from this layout's coordinate system to bypass any intermediate
-		// PointInside bounds check on the subview itself.
+		// Searches a subview's subtree for a hit, converting touch coordinates from
+		// *this* layout's coordinate system to bypass any intermediate PointInside
+		// bounds check on the subview itself.
 		UIView? HitTestInSubtree(UIView subview, CGPoint point, UIEvent? uievent)
 		{
+			// When the subview is itself a LayoutView its overridden HitTest already
+			// handles ClipsToBounds=false and deeper overflow children. Call it directly
+			// with the touch point converted from *this* layout's space — bypassing the
+			// UIKit PointInside check that would wrongly reject out-of-bounds overflow
+			// touches. We only accept the result when it is a *descendant*; if HitTest
+			// returns the subview itself that means UIKit found no accepting child and
+			// fell back to the container, so we must continue the grandchild search below.
+			if (subview is LayoutView layoutSubview)
+			{
+				var subviewPoint = layoutSubview.ConvertPointFromView(point, this);
+				var layoutHit = layoutSubview.HitTest(subviewPoint, uievent);
+				if (layoutHit is not null && !ReferenceEquals(layoutHit, layoutSubview))
+					return layoutHit;
+			}
+
+			// For non-LayoutView subviews (e.g. native UIView wrappers), or when the
+			// LayoutView's own HitTest found no accepting descendant, iterate the
+			// subview's direct children in reverse z-order. Converting the touch from
+			// *this* layout's coordinate system straight to each grandchild skips the
+			// intermediate PointInside check on the subview.
 			if (subview.Subviews is null || subview.Subviews.Length == 0)
 				return null;
 
-			// Iterate the subview's children in reverse z-order.
 			for (int i = subview.Subviews.Length - 1; i >= 0; i--)
 			{
 				var grandchild = subview.Subviews[i];
@@ -88,8 +107,6 @@ namespace Microsoft.Maui.Platform
 				if (grandchild.Hidden || grandchild.Alpha < 0.01f || !grandchild.UserInteractionEnabled)
 					continue;
 
-				// Convert the touch point from *this* layout's coordinate system directly
-				// to the grandchild's coordinate system, skipping the subview's own bounds.
 				var grandchildPoint = grandchild.ConvertPointFromView(point, this);
 				var hit = grandchild.HitTest(grandchildPoint, uievent);
 
