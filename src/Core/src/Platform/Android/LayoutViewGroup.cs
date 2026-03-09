@@ -227,6 +227,61 @@ namespace Microsoft.Maui.Platform
 			return base.OnTouchEvent(e);
 		}
 
+		public override bool DispatchTouchEvent(MotionEvent? e)
+		{
+			// Standard Android touch dispatch only forwards to a child when the touch point
+			// lies within that child's declared bounds. When ClipsToBounds is false a child
+			// layout may have descendant views arranged beyond its own bounds (overflow), so
+			// the standard path skips it entirely. After the regular dispatch we therefore
+			// walk each direct child that (a) was skipped due to out-of-bounds, and (b) is
+			// itself a LayoutViewGroup that does not clip – meaning it can host overflow
+			// content – and give it another chance to handle the event.
+			bool handled = base.DispatchTouchEvent(e);
+
+			if (!handled && !ClipsToBounds && e is not null)
+			{
+				float x = e.GetX();
+				float y = e.GetY();
+
+				for (int i = ChildCount - 1; i >= 0 && !handled; i--)
+				{
+					var child = GetChildAt(i);
+
+					if (child is null || child.Visibility != ViewStates.Visible)
+						continue;
+
+					// Skip children whose bounds already contain the touch point – the
+					// standard dispatch already tried those above.
+					bool inBounds = x >= child.Left && x < child.Right
+								 && y >= child.Top && y < child.Bottom;
+
+					if (inBounds)
+						continue;
+
+					// Only try children that themselves don't clip; they may have their
+					// own overflow descendants that can accept the touch.
+					if (child is not LayoutViewGroup childLayout || childLayout.ClipsToBounds)
+						continue;
+
+					var childEvent = MotionEvent.Obtain(e);
+					if (childEvent is null)
+						continue;
+
+					try
+					{
+						childEvent.OffsetLocation(-child.Left, -child.Top);
+						handled = child.DispatchTouchEvent(childEvent);
+					}
+					finally
+					{
+						childEvent.Recycle();
+					}
+				}
+			}
+
+			return handled;
+		}
+
 		IVisualTreeElement? IVisualTreeElementProvidable.GetElement()
 		{
 			if (CrossPlatformLayout is IVisualTreeElement layoutElement &&

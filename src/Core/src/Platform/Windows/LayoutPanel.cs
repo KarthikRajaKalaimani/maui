@@ -63,6 +63,19 @@ namespace Microsoft.Maui.Platform
 
 			if (background == null)
 			{
+				// When the layout has no explicit background and does not clip its children,
+				// leave Background null so the panel is invisible to hit-testing at any area
+				// not covered by a child. This allows overflow children (i.e., children that
+				// are arranged beyond the panel's own declared bounds) to receive pointer
+				// events even when a sibling panel at higher z-order covers that area.
+				// When ClipsToBounds is true the panel already clips both visuals and
+				// hit-testing via the Clip geometry, so no special treatment is needed.
+				if (!ClipsToBounds)
+				{
+					Background = null;
+					return;
+				}
+
 				// We can't have a null background, because that would allow input through
 				// So we'll make the background color transparent (visually the same as null, but consumes input)
 				background = new WSolidColorBrush(UI.Colors.Transparent);

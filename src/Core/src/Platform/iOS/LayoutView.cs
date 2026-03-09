@@ -21,6 +21,30 @@ namespace Microsoft.Maui.Platform
 
 		public override UIView? HitTest(CGPoint point, UIEvent? uievent)
 		{
+			// When this layout does not clip its children, a child view may be arranged
+			// beyond this layout's own bounds. UIKit's standard hitTest stops traversal
+			// whenever a subview's PointInside returns false, so those overflow children are
+			// never reached. We work around this by directly inspecting each subview's own
+			// children (grandchildren of this layout) before falling back to the standard
+			// algorithm. Converting the touch point from this layout's coordinate system
+			// straight to the grandchild bypasses the intermediate PointInside check.
+			if (!ClipsToBounds)
+			{
+				// Iterate direct subviews in reverse z-order (last added = topmost).
+				for (int i = Subviews.Length - 1; i >= 0; i--)
+				{
+					var subview = Subviews[i];
+
+					if (subview.Hidden || subview.Alpha < 0.01f || !subview.UserInteractionEnabled)
+						continue;
+
+					var hit = HitTestInSubtree(subview, point, uievent);
+					if (hit is not null)
+						return hit;
+				}
+			}
+
+			// Standard hit-testing: handles the common in-bounds case and ClipsToBounds=true.
 			var result = base.HitTest(point, uievent);
 
 			if (result is null)
@@ -46,6 +70,34 @@ namespace Microsoft.Maui.Platform
 			}
 
 			return result;
+		}
+
+		// Searches the subview's own children for a hit, converting touch coordinates
+		// directly from this layout's coordinate system to bypass any intermediate
+		// PointInside bounds check on the subview itself.
+		UIView? HitTestInSubtree(UIView subview, CGPoint point, UIEvent? uievent)
+		{
+			if (subview.Subviews is null || subview.Subviews.Length == 0)
+				return null;
+
+			// Iterate the subview's children in reverse z-order.
+			for (int i = subview.Subviews.Length - 1; i >= 0; i--)
+			{
+				var grandchild = subview.Subviews[i];
+
+				if (grandchild.Hidden || grandchild.Alpha < 0.01f || !grandchild.UserInteractionEnabled)
+					continue;
+
+				// Convert the touch point from *this* layout's coordinate system directly
+				// to the grandchild's coordinate system, skipping the subview's own bounds.
+				var grandchildPoint = grandchild.ConvertPointFromView(point, this);
+				var hit = grandchild.HitTest(grandchildPoint, uievent);
+
+				if (hit is not null)
+					return hit;
+			}
+
+			return null;
 		}
 
 		internal bool UserInteractionEnabledOverride => _userInteractionEnabled;
