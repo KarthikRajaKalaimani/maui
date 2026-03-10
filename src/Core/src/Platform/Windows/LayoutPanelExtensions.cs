@@ -8,6 +8,11 @@ namespace Microsoft.Maui.Platform
 		{
 			layoutPanel.ClipsToBounds = layout.ClipsToBounds;
 			layoutPanel.InvalidateArrange();
+
+			// ClipsToBounds affects whether Background should be null (hit-test transparent)
+			// or a Transparent brush (hit-test opaque). Re-evaluate the background so that
+			// a dynamic ClipsToBounds change is reflected immediately.
+			layoutPanel.UpdatePlatformViewBackground(layout);
 		}
 	}
 }
