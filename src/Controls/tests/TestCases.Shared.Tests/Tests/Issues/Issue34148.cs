@@ -1,3 +1,4 @@
+#if TEST_FAILS_ON_WINDOWS // This test fails on Windows because the AutomationId is not works for Layout, so we can't find the element to tap on.
 using NUnit.Framework;
 using UITest.Appium;
 using UITest.Core;
@@ -37,3 +38,4 @@ public class Issue34148 : _IssuesUITest
 			"Tap gesture should be recognized in the spanned (overflow) region of the custom layout child.");
 	}
 }
+#endif
