@@ -92,6 +92,13 @@ namespace Microsoft.Maui.Platform
 					return layoutHit;
 			}
 
+			// If the subview is an InputTransparent LayoutView (UserInteractionEnabledOverride
+			// is false), skip its grandchild search. Its own HitTest above already ran and
+			// correctly returned null for itself; we should not bypass that by probing its
+			// children directly.
+			if (subview is LayoutView inputTransparentLayout && !inputTransparentLayout.UserInteractionEnabledOverride)
+				return null;
+
 			// For non-LayoutView subviews (e.g. native UIView wrappers), or when the
 			// LayoutView's own HitTest found no accepting descendant, iterate the
 			// subview's direct children in reverse z-order. Converting the touch from
