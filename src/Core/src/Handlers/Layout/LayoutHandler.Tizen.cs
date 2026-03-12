@@ -64,6 +64,23 @@ namespace Microsoft.Maui.Handlers
 			PlatformView.SetNeedMeasureUpdate();
 		}
 
+		public void AddRange(IReadOnlyList<IView> children)
+		{
+			_ = PlatformView ?? throw new InvalidOperationException($"{nameof(PlatformView)} should have been set by base class.");
+			_ = VirtualView ?? throw new InvalidOperationException($"{nameof(VirtualView)} should have been set by base class.");
+			_ = MauiContext ?? throw new InvalidOperationException($"{nameof(MauiContext)} should have been set by base class.");
+
+			foreach (var child in children)
+			{
+				var targetIndex = VirtualView.GetLayoutHandlerIndex(child);
+				PlatformView.Children.Insert(targetIndex, child.ToPlatform(MauiContext));
+				_children.Insert(targetIndex, child);
+				EnsureZIndexOrder(child);
+			}
+
+			PlatformView.SetNeedMeasureUpdate();
+		}
+
 		public void Remove(IView child)
 		{
 			_ = PlatformView ?? throw new InvalidOperationException($"{nameof(PlatformView)} should have been set by base class.");

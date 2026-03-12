@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Maui.Graphics;
 using Microsoft.UI.Xaml;
 
@@ -14,6 +15,19 @@ namespace Microsoft.Maui.Handlers
 
 			var targetIndex = VirtualView.GetLayoutHandlerIndex(child);
 			PlatformView.CachedChildren.Insert(targetIndex, child.ToPlatform(MauiContext));
+		}
+
+		public void AddRange(IReadOnlyList<IView> children)
+		{
+			_ = PlatformView ?? throw new InvalidOperationException($"{nameof(PlatformView)} should have been set by base class.");
+			_ = VirtualView ?? throw new InvalidOperationException($"{nameof(VirtualView)} should have been set by base class.");
+			_ = MauiContext ?? throw new InvalidOperationException($"{nameof(MauiContext)} should have been set by base class.");
+
+			foreach (var child in children)
+			{
+				var targetIndex = VirtualView.GetLayoutHandlerIndex(child);
+				PlatformView.CachedChildren.Insert(targetIndex, child.ToPlatform(MauiContext));
+			}
 		}
 
 		public override void SetVirtualView(IView view)

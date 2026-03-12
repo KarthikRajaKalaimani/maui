@@ -9,6 +9,7 @@ using PlatformView = Microsoft.Maui.Platform.LayoutViewGroup;
 #elif (NETSTANDARD || !PLATFORM) || (NET6_0_OR_GREATER && !IOS && !ANDROID && !TIZEN)
 using PlatformView = System.Object;
 #endif
+using System.Collections.Generic;
 
 namespace Microsoft.Maui
 {
@@ -23,5 +24,14 @@ namespace Microsoft.Maui
 		void Insert(int index, IView view);
 		void Update(int index, IView view);
 		void UpdateZIndex(IView view);
+
+		/// <summary>
+		/// Adds multiple child views in a single batch operation. Unlike calling
+		/// <see cref="Add(IView)"/> repeatedly, this method triggers layout invalidation
+		/// only once after all children have been added, which can significantly improve
+		/// performance when adding many children at the same time.
+		/// </summary>
+		/// <param name="views">The list of child views to add.</param>
+		void AddRange(IReadOnlyList<IView> views);
 	}
 }

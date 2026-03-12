@@ -1,2 +1,5 @@
-#nullable enable
+﻿#nullable enable
+Microsoft.Maui.Handlers.LayoutHandler.AddRange(System.Collections.Generic.IReadOnlyList<Microsoft.Maui.IView!>! children) -> void
+Microsoft.Maui.ILayoutHandler.AddRange(System.Collections.Generic.IReadOnlyList<Microsoft.Maui.IView!>! views) -> void
 override Microsoft.Maui.Platform.MauiView.DidUpdateFocus(UIKit.UIFocusUpdateContext! context, UIKit.UIFocusAnimationCoordinator! coordinator) -> void
+static Microsoft.Maui.Handlers.LayoutHandler.MapAddRange(Microsoft.Maui.ILayoutHandler! handler, Microsoft.Maui.ILayout! layout, object? arg) -> void

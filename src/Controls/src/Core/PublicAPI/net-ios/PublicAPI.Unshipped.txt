@@ -1,4 +1,6 @@
-#nullable enable
+﻿#nullable enable
+~Microsoft.Maui.Controls.Layout.AddRange(System.Collections.Generic.IEnumerable<Microsoft.Maui.IView> children) -> void
 ~override Microsoft.Maui.Controls.Platform.Compatibility.ShellFlyoutRenderer.ViewWillTransitionToSize(CoreGraphics.CGSize toSize, UIKit.IUIViewControllerTransitionCoordinator coordinator) -> void
-override Microsoft.Maui.Controls.Platform.Compatibility.ShellTableViewController.LoadView() -> void
 *REMOVED*~override Microsoft.Maui.Controls.Platform.Compatibility.ShellSectionRootRenderer.TraitCollectionDidChange(UIKit.UITraitCollection previousTraitCollection) -> void
+override Microsoft.Maui.Controls.Platform.Compatibility.ShellTableViewController.LoadView() -> void
+~virtual Microsoft.Maui.Controls.Layout.OnAddRange(System.Collections.Generic.IReadOnlyList<Microsoft.Maui.IView> views) -> void

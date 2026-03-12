@@ -10,6 +10,7 @@ using PlatformView = Microsoft.Maui.Platform.LayoutViewGroup;
 #elif (NETSTANDARD || !PLATFORM)
 using PlatformView = System.Object;
 #endif
+using System.Collections.Generic;
 
 namespace Microsoft.Maui.Handlers
 {
@@ -36,6 +37,7 @@ namespace Microsoft.Maui.Handlers
 			[nameof(ILayoutHandler.Insert)] = MapInsert,
 			[nameof(ILayoutHandler.Update)] = MapUpdate,
 			[nameof(ILayoutHandler.UpdateZIndex)] = MapUpdateZIndex,
+			[nameof(ILayoutHandler.AddRange)] = MapAddRange,
 		};
 
 		public LayoutHandler() : base(Mapper, CommandMapper)
@@ -120,6 +122,14 @@ namespace Microsoft.Maui.Handlers
 			if (arg is IView view)
 			{
 				handler.UpdateZIndex(view);
+			}
+		}
+
+		public static void MapAddRange(ILayoutHandler handler, ILayout layout, object? arg)
+		{
+			if (arg is IReadOnlyList<IView> views)
+			{
+				handler.AddRange(views);
 			}
 		}
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ObjCRuntime;
 using UIKit;
 using PlatformView = UIKit.UIView;
@@ -57,6 +58,30 @@ namespace Microsoft.Maui.Handlers
 				childPlatformView.UpdateFlowDirection(child);
 			}
 
+			PlatformView.InvalidateAncestorsMeasures();
+		}
+
+		public void AddRange(IReadOnlyList<IView> children)
+		{
+			_ = PlatformView ?? throw new InvalidOperationException($"{nameof(PlatformView)} should have been set by base class.");
+			_ = VirtualView ?? throw new InvalidOperationException($"{nameof(VirtualView)} should have been set by base class.");
+			_ = MauiContext ?? throw new InvalidOperationException($"{nameof(MauiContext)} should have been set by base class.");
+
+			foreach (var child in children)
+			{
+				var targetIndex = VirtualView.GetLayoutHandlerIndex(child);
+				var childPlatformView = child.ToPlatform(MauiContext);
+				PlatformView.InsertSubview(childPlatformView, targetIndex);
+
+				if (child.FlowDirection == FlowDirection.MatchParent)
+				{
+					childPlatformView.UpdateFlowDirection(child);
+				}
+			}
+
+			// Invalidate ancestors only once after all children are added,
+			// instead of once per child as Add() does. This is the same efficient
+			// pattern used by SetVirtualView() and avoids O(N) layout invalidations.
 			PlatformView.InvalidateAncestorsMeasures();
 		}
 

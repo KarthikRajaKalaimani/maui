@@ -190,6 +190,50 @@ namespace Microsoft.Maui.Controls
 		}
 
 		/// <summary>
+		/// Adds multiple child views to this layout in a single batch operation.
+		/// This is more efficient than calling <see cref="Add(IView)"/> repeatedly
+		/// because it triggers a single layout invalidation after all children are added,
+		/// instead of one per child. Use this when adding many children at once.
+		/// </summary>
+		/// <param name="children">The collection of child views to add.</param>
+		public void AddRange(IEnumerable<IView> children)
+		{
+			if (children is null)
+				return;
+
+			var added = new List<IView>();
+
+			foreach (var child in children)
+			{
+				if (child is null)
+					continue;
+
+				_children.Add(child);
+
+				if (child is Element element)
+				{
+					AddLogicalChild(element);
+				}
+
+				added.Add(child);
+			}
+
+			if (added.Count > 0)
+			{
+				OnAddRange(added);
+			}
+		}
+
+		/// <summary>
+		/// Invoked when <see cref="AddRange(IEnumerable{IView})"/> is called and notifies the handler.
+		/// </summary>
+		/// <param name="views">The list of child views that were added.</param>
+		protected virtual void OnAddRange(IReadOnlyList<IView> views)
+		{
+			Handler?.Invoke(nameof(ILayoutHandler.AddRange), (object)views);
+		}
+
+		/// <summary>
 		/// Clears all child views from this layout.
 		/// </summary>
 		public void Clear()
