@@ -1,9 +1,9 @@
 #nullable disable
 using System;
 using Android.Views;
+using Android.Widget;
 using Microsoft.Maui.Graphics;
 using System.Runtime.Versioning;
-using Microsoft.Maui.Controls.Handlers.Items;
 using AView = Android.Views.View;
 
 namespace Microsoft.Maui.Controls.Platform
@@ -71,11 +71,14 @@ namespace Microsoft.Maui.Controls.Platform
 				return false;
 
 			var platformPointerArgs = new PlatformPointerEventArgs(control, e);
+			bool handled = false;
 
 			foreach (var gesture in view.GetCompositeGestureRecognizers())
 			{
 				if (gesture is PointerGestureRecognizer pgr)
 				{
+					handled = true;
+
 					// Determine the button for this action. For Move/Up/Cancel prefer the active button, if any.
 					ButtonsMask current = GetPressedButton(e);
 					ButtonsMask effectiveButton = current;
@@ -108,7 +111,7 @@ namespace Microsoft.Maui.Controls.Platform
 							if (!CheckButtonMask(pgr, effectiveButton))
 								continue;
 							pgr.SendPointerReleased(view, (relativeTo) => e.CalculatePosition(GetView(), relativeTo), platformPointerArgs, effectiveButton);
-							TrySelectCollectionViewItem(control);
+							TryDispatchAncestorClick(control, effectiveButton);
 							// Clear active button after release
 							_activeButton = null;
 							_touchMoved = false;
@@ -126,7 +129,7 @@ namespace Microsoft.Maui.Controls.Platform
 				}
 			}
 
-			return false;
+			return handled;
 		}
 
 		ButtonsMask GetPressedButton(MotionEvent motionEvent)
@@ -251,18 +254,28 @@ namespace Microsoft.Maui.Controls.Platform
 			return Math.Abs(e.RawX - _touchStartX) > touchSlop || Math.Abs(e.RawY - _touchStartY) > touchSlop;
 		}
 
-		void TrySelectCollectionViewItem(AView control)
+		void TryDispatchAncestorClick(AView control, ButtonsMask button)
 		{
-			if (_touchMoved || !HasOnlyPointerGestures())
+			if (button != ButtonsMask.Primary || _touchMoved || !HasOnlyPointerGestures())
 				return;
 
-			for (var parent = control.Parent; parent != null; parent = parent.Parent)
+			for (AView descendant = control; descendant?.Parent is AView parent; descendant = parent)
 			{
-				if (parent is ItemContentView itemContentView)
+				if (parent is AdapterView adapterView)
 				{
-					itemContentView.ClickOn();
-					return;
+					var position = adapterView.GetPositionForView(descendant);
+					if (position != AdapterView.InvalidPosition)
+					{
+						var id = adapterView.GetItemIdAtPosition(position);
+						if (adapterView.PerformItemClick(descendant, position, id))
+							return;
+					}
+
+					continue;
 				}
+
+				if (parent.CallOnClick() || parent.PerformClick())
+					return;
 			}
 		}
 	}
