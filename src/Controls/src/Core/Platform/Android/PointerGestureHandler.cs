@@ -3,6 +3,7 @@ using System;
 using Android.Views;
 using Microsoft.Maui.Graphics;
 using System.Runtime.Versioning;
+using Microsoft.Maui.Controls.Handlers.Items;
 using AView = Android.Views.View;
 
 namespace Microsoft.Maui.Controls.Platform
@@ -11,6 +12,9 @@ namespace Microsoft.Maui.Controls.Platform
 	{
 		// Tracks the last button pressed so we can use it for subsequent Move/Up/Cancel
 		ButtonsMask? _activeButton;
+		float _touchStartX;
+		float _touchStartY;
+		bool _touchMoved;
 
 		internal PointerGestureHandler(Func<View> getView, Func<AView> getControl)
 		{
@@ -81,6 +85,9 @@ namespace Microsoft.Maui.Controls.Platform
 						case MotionEventActions.Down:
 							// Primary button goes through Down/Up
 							_activeButton = current;
+							_touchStartX = e.RawX;
+							_touchStartY = e.RawY;
+							_touchMoved = false;
 							effectiveButton = current;
 							if (!CheckButtonMask(pgr, effectiveButton))
 								continue;
@@ -89,6 +96,8 @@ namespace Microsoft.Maui.Controls.Platform
 						case MotionEventActions.Move:
 							// Keep reporting the button that initiated the press if one is active
 							effectiveButton = _activeButton ?? current;
+							if (!_touchMoved && HasExceededTouchSlop(control, e))
+								_touchMoved = true;
 							if (!CheckButtonMask(pgr, effectiveButton))
 								continue;
 							pgr.SendPointerMoved(view, (relativeTo) => e.CalculatePosition(GetView(), relativeTo), platformPointerArgs, effectiveButton);
@@ -99,8 +108,10 @@ namespace Microsoft.Maui.Controls.Platform
 							if (!CheckButtonMask(pgr, effectiveButton))
 								continue;
 							pgr.SendPointerReleased(view, (relativeTo) => e.CalculatePosition(GetView(), relativeTo), platformPointerArgs, effectiveButton);
+							TrySelectCollectionViewItem(control);
 							// Clear active button after release
 							_activeButton = null;
+							_touchMoved = false;
 							break;
 						case MotionEventActions.Cancel:
 							// Treat cancel similar to release for active button, then exit
@@ -109,6 +120,7 @@ namespace Microsoft.Maui.Controls.Platform
 								continue;
 							pgr.SendPointerExited(view, (relativeTo) => e.CalculatePosition(GetView(), relativeTo), platformPointerArgs, effectiveButton);
 							_activeButton = null;
+							_touchMoved = false;
 							break;
 					}
 				}
@@ -210,6 +222,48 @@ namespace Microsoft.Maui.Controls.Platform
 					return true;
 
 			return false;
+		}
+
+		bool HasOnlyPointerGestures()
+		{
+			var gestures = GetView().GetCompositeGestureRecognizers();
+			if (gestures == null || gestures.Count == 0)
+				return false;
+
+			bool hasPointerGesture = false;
+			foreach (var gesture in gestures)
+			{
+				if (gesture is PointerGestureRecognizer)
+				{
+					hasPointerGesture = true;
+					continue;
+				}
+
+				return false;
+			}
+
+			return hasPointerGesture;
+		}
+
+		bool HasExceededTouchSlop(AView control, MotionEvent e)
+		{
+			var touchSlop = ViewConfiguration.Get(control.Context)?.ScaledTouchSlop ?? 0;
+			return Math.Abs(e.RawX - _touchStartX) > touchSlop || Math.Abs(e.RawY - _touchStartY) > touchSlop;
+		}
+
+		void TrySelectCollectionViewItem(AView control)
+		{
+			if (_touchMoved || !HasOnlyPointerGestures())
+				return;
+
+			for (var parent = control.Parent; parent != null; parent = parent.Parent)
+			{
+				if (parent is ItemContentView itemContentView)
+				{
+					itemContentView.ClickOn();
+					return;
+				}
+			}
 		}
 	}
 }
