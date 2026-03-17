@@ -2,8 +2,11 @@
 using System;
 using Android.Views;
 using Android.Widget;
+using AndroidX.Core.Widget;
+using AndroidX.RecyclerView.Widget;
 using Microsoft.Maui.Graphics;
 using System.Runtime.Versioning;
+using AScrollView = Android.Widget.ScrollView;
 using AView = Android.Views.View;
 
 namespace Microsoft.Maui.Controls.Platform
@@ -267,14 +270,16 @@ namespace Microsoft.Maui.Controls.Platform
 					if (position != AdapterView.InvalidPosition)
 					{
 						var id = adapterView.GetItemIdAtPosition(position);
-						if (adapterView.PerformItemClick(descendant, position, id))
-							return;
+						adapterView.PerformItemClick(descendant, position, id);
 					}
 
-					continue;
+					return;
 				}
 
-				if (parent.CallOnClick() || parent.PerformClick())
+				if (parent.CallOnClick())
+					return;
+
+				if (parent is RecyclerView or NestedScrollView or AScrollView)
 					return;
 			}
 		}
