@@ -98,14 +98,24 @@ namespace Microsoft.Maui.Controls.Platform
 				return;
 			}
 
-			// Adjust the ScrollViewer's hit test visibility if it exists
+			bool isVisible = visibility == WVisibility.Visible;
+			bool inputTransparent = _formsEmptyView?.InputTransparent ?? false;
+
 			if (_scrollViewer is not null)
 			{
-				// When the empty view is visible, disable hit testing for the ScrollViewer.
-				// This ensures that interactions are directed to the empty view instead of the ScrollViewer.
-				// In the template, the empty view is placed below the ScrollViewer in the visual tree.
-				_scrollViewer.IsHitTestVisible = visibility != WVisibility.Visible;
+				// Disable the ScrollViewer's hit-testing only when the EmptyView is visible AND wants
+				// to receive input (i.e. InputTransparent is false). In the template, the EmptyView is
+				// placed below the ScrollViewer, so we disable the ScrollViewer to let taps reach it.
+				// When InputTransparent="True" the EmptyView does not intercept input, so we keep the
+				// ScrollViewer active; this allows the CollectionView Header (inside the ScrollViewer)
+				// to remain fully interactive while the EmptyView is displayed.
+				_scrollViewer.IsHitTestVisible = !(isVisible && !inputTransparent);
 			}
+
+			// When the EmptyView is InputTransparent, also mark the ContentControl wrapper as
+			// non-hit-testable. This guarantees that no layer of the EmptyView container can
+			// accidentally block taps destined for the Header in the ScrollViewer above.
+			_emptyViewContentControl.IsHitTestVisible = !(isVisible && inputTransparent);
 
 			_emptyViewContentControl.Visibility = visibility;
 		}
