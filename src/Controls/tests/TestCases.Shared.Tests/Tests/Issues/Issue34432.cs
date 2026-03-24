@@ -19,9 +19,7 @@ public class Issue34432 : _IssuesUITest
 
 		// Tap the header button while EmptyView is displayed
 		App.Tap("HeaderButton");
-
-		// Verify the button tap was received (fails on Windows due to the bug where
-		// the EmptyView blocks interaction with the CollectionView header)
-		App.WaitForTextToBePresentInElement("ClickCountLabel", "Clicked: 1");
+		var newText = App.WaitForElement("ClickCountLabel").GetText();
+		Assert.That(newText, Is.EqualTo("Clicked: 1"));
 	}
 }
