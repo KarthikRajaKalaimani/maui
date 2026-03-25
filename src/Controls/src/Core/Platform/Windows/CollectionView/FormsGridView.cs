@@ -207,6 +207,11 @@ namespace Microsoft.Maui.Controls.Platform
 		double GetHeaderHeight()
 		{
 			var headerItem = this.GetFirstDescendant<UwpGridViewHeaderItem>();
+			if (headerItem is null && _headerElement is null)
+			{
+				return 0;
+			}
+
 			double headerItemHeight = headerItem?.ActualHeight ?? 0;
 			double headerElementHeight = _headerElement?.ActualHeight ?? 0;
 			double desiredHeaderHeight = _headerElement?.DesiredSize.Height ?? 0;

@@ -106,6 +106,8 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 				return;
 			}
 
+			FrameworkElement headerElement = null;
+
 			if (_currentHeader != null)
 			{
 				Element.RemoveLogicalChild(_currentHeader);
@@ -122,7 +124,8 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 
 				case string text:
 					ListViewBase.HeaderTemplate = null;
-					ListViewBase.Header = new TextBlock { Text = text };
+					headerElement = new TextBlock { Text = text };
+					ListViewBase.Header = headerElement;
 					break;
 
 				case View view:
@@ -130,6 +133,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 					_currentHeader = view;
 					Element.AddLogicalChild(_currentHeader);
 					ListViewBase.Header = view;
+					headerElement = view.ToPlatform(MauiContext);
 					break;
 
 				default:
@@ -146,6 +150,9 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 					}
 					break;
 			}
+
+			(ListViewBase as IEmptyView)?.SetHeader(headerElement);
+			(ListViewBase as IEmptyView)?.UpdateHeaderMargin();
 		}
 
 		protected virtual void UpdateFooter()
