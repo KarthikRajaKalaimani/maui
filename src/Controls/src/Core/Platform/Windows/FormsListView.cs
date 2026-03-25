@@ -5,7 +5,9 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using UwpApp = Microsoft.UI.Xaml.Application;
 using UwpControlTemplate = Microsoft.UI.Xaml.Controls.ControlTemplate;
+using UwpListViewHeaderItem = Microsoft.UI.Xaml.Controls.ListViewHeaderItem;
 using UwpScrollBarVisibility = Microsoft.UI.Xaml.Controls.ScrollBarVisibility;
+using UwpThickness = Microsoft.UI.Xaml.Thickness;
 using WVisibility = Microsoft.UI.Xaml.Visibility;
 
 namespace Microsoft.Maui.Controls.Platform
@@ -13,7 +15,7 @@ namespace Microsoft.Maui.Controls.Platform
 	internal partial class FormsListView : Microsoft.UI.Xaml.Controls.ListView, IEmptyView
 	{
 		ContentControl _emptyViewContentControl;
-		ScrollViewer _scrollViewer;
+		FrameworkElement _headerElement;
 		FrameworkElement _emptyView;
 		View _formsEmptyView;
 
@@ -63,13 +65,18 @@ namespace Microsoft.Maui.Controls.Platform
 			}
 		}
 
+		public void UpdateHeaderMargin() => UpdateEmptyViewVisibility(EmptyViewVisibility);
+
+		public void SetHeader(FrameworkElement headerElement)
+		{
+			_headerElement = headerElement;
+		}
+
 		protected override void OnApplyTemplate()
 		{
 			base.OnApplyTemplate();
 
 			_emptyViewContentControl = GetTemplateChild("EmptyViewContentControl") as ContentControl;
-
-			_scrollViewer = GetTemplateChild("ScrollViewer") as ScrollViewer;
 
 			if (_emptyView != null)
 			{
@@ -80,9 +87,14 @@ namespace Microsoft.Maui.Controls.Platform
 
 		protected override global::Windows.Foundation.Size ArrangeOverride(global::Windows.Foundation.Size finalSize)
 		{
-			_formsEmptyView?.Arrange(new Rect(0, 0, finalSize.Width, finalSize.Height));
+			double headerHeight = GetHeaderHeight();
+			double emptyViewHeight = Math.Max(0, finalSize.Height - headerHeight);
 
-			return base.ArrangeOverride(finalSize);
+			_formsEmptyView?.Arrange(new Rect(0, 0, finalSize.Width, emptyViewHeight));
+
+			var result = base.ArrangeOverride(finalSize);
+			UpdateEmptyViewVisibility(EmptyViewVisibility);
+			return result;
 		}
 
 		protected override void PrepareContainerForItemOverride(DependencyObject element, object item)
@@ -99,25 +111,38 @@ namespace Microsoft.Maui.Controls.Platform
 			}
 
 			bool isVisible = visibility == WVisibility.Visible;
-			bool inputTransparent = _formsEmptyView?.InputTransparent ?? false;
+			bool isInteractiveEmptyView = _formsEmptyView?.InputTransparent == false;
+			double headerHeight = GetHeaderHeight();
 
-			if (_scrollViewer is not null)
-			{
-				// Disable the ScrollViewer's hit-testing only when the EmptyView is visible AND wants
-				// to receive input (i.e. InputTransparent is false). In the template, the EmptyView is
-				// placed below the ScrollViewer, so we disable the ScrollViewer to let taps reach it.
-				// When InputTransparent="True" the EmptyView does not intercept input, so we keep the
-				// ScrollViewer active; this allows the CollectionView Header (inside the ScrollViewer)
-				// to remain fully interactive while the EmptyView is displayed.
-				_scrollViewer.IsHitTestVisible = !(isVisible && !inputTransparent);
-			}
-
-			// When the EmptyView is InputTransparent, also mark the ContentControl wrapper as
-			// non-hit-testable. This guarantees that no layer of the EmptyView container can
-			// accidentally block taps destined for the Header in the ScrollViewer above.
-			_emptyViewContentControl.IsHitTestVisible = !(isVisible && inputTransparent);
+			_emptyViewContentControl.Margin = new UwpThickness(0, headerHeight, 0, 0);
+			_emptyViewContentControl.IsHitTestVisible = isVisible && isInteractiveEmptyView;
 
 			_emptyViewContentControl.Visibility = visibility;
+		}
+
+		double GetHeaderHeight()
+		{
+			var headerItem = this.GetFirstDescendant<UwpListViewHeaderItem>();
+			double headerItemHeight = headerItem?.ActualHeight ?? 0;
+			double headerElementHeight = _headerElement?.ActualHeight ?? 0;
+			double desiredHeaderHeight = _headerElement?.DesiredSize.Height ?? 0;
+			double fallbackHeight = GetThemeHeaderMinHeight();
+			double headerHeight = Math.Max(headerItemHeight, Math.Max(headerElementHeight, Math.Max(desiredHeaderHeight, fallbackHeight)));
+
+			return headerHeight;
+		}
+
+		double GetThemeHeaderMinHeight() =>
+			TryGetDoubleResource("ListViewHeaderItemMinHeight");
+
+		double TryGetDoubleResource(string resourceKey)
+		{
+			if (UwpApp.Current.Resources.TryGetValue(resourceKey, out var value) && value is double dimension)
+			{
+				return dimension;
+			}
+
+			return 0;
 		}
 	}
 }

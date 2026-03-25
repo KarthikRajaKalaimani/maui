@@ -5,6 +5,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using UWPApp = Microsoft.UI.Xaml.Application;
 using UWPControls = Microsoft.UI.Xaml.Controls;
+using UwpGridViewHeaderItem = Microsoft.UI.Xaml.Controls.GridViewHeaderItem;
+using UwpThickness = Microsoft.UI.Xaml.Thickness;
 using WScrollMode = Microsoft.UI.Xaml.Controls.ScrollMode;
 using WVisibility = Microsoft.UI.Xaml.Visibility;
 
@@ -15,7 +17,7 @@ namespace Microsoft.Maui.Controls.Platform
 		int _span;
 		ItemsWrapGrid _wrapGrid;
 		ContentControl _emptyViewContentControl;
-		ScrollViewer _scrollViewer;
+		FrameworkElement _headerElement;
 		FrameworkElement _emptyView;
 		View _formsEmptyView;
 		Orientation _orientation;
@@ -147,13 +149,18 @@ namespace Microsoft.Maui.Controls.Platform
 			}
 		}
 
+		public void UpdateHeaderMargin() => UpdateEmptyViewVisibility(EmptyViewVisibility);
+
+		public void SetHeader(FrameworkElement headerElement)
+		{
+			_headerElement = headerElement;
+		}
+
 		protected override void OnApplyTemplate()
 		{
 			base.OnApplyTemplate();
 
 			_emptyViewContentControl = GetTemplateChild("EmptyViewContentControl") as ContentControl;
-
-			_scrollViewer = GetTemplateChild("ScrollViewer") as ScrollViewer;
 
 			if (_emptyView != null && _emptyViewContentControl != null)
 			{
@@ -164,9 +171,14 @@ namespace Microsoft.Maui.Controls.Platform
 
 		protected override global::Windows.Foundation.Size ArrangeOverride(global::Windows.Foundation.Size finalSize)
 		{
-			_formsEmptyView?.Arrange(new Rect(0, 0, finalSize.Width, finalSize.Height));
+			double headerHeight = GetHeaderHeight();
+			double emptyViewHeight = Math.Max(0, finalSize.Height - headerHeight);
 
-			return base.ArrangeOverride(finalSize);
+			_formsEmptyView?.Arrange(new Rect(0, 0, finalSize.Width, emptyViewHeight));
+
+			var result = base.ArrangeOverride(finalSize);
+			UpdateEmptyViewVisibility(EmptyViewVisibility);
+			return result;
 		}
 
 		protected override void PrepareContainerForItemOverride(DependencyObject element, object item)
@@ -183,18 +195,38 @@ namespace Microsoft.Maui.Controls.Platform
 			}
 
 			bool isVisible = visibility == WVisibility.Visible;
-			bool inputTransparent = _formsEmptyView?.InputTransparent ?? false;
+			bool isInteractiveEmptyView = _formsEmptyView?.InputTransparent == false;
+			double headerHeight = GetHeaderHeight();
 
-			// The EmptyViewContentControl is placed above the ScrollViewer in the visual tree (declared
-			// after it in the template Grid). The EmptyView therefore receives input naturally when
-			// hit-testable. We never need to disable the ScrollViewer's hit-testing.
-			//
-			// When EmptyView.InputTransparent="True", mark the ContentControl wrapper as non-hit-testable
-			// so that no layer of the EmptyView container accidentally blocks taps that should reach the
-			// CollectionView Header inside the ScrollViewer below.
-			_emptyViewContentControl.IsHitTestVisible = !(isVisible && inputTransparent);
+			_emptyViewContentControl.Margin = new UwpThickness(0, headerHeight, 0, 0);
+			_emptyViewContentControl.IsHitTestVisible = isVisible && isInteractiveEmptyView;
 
 			_emptyViewContentControl.Visibility = visibility;
+		}
+
+		double GetHeaderHeight()
+		{
+			var headerItem = this.GetFirstDescendant<UwpGridViewHeaderItem>();
+			double headerItemHeight = headerItem?.ActualHeight ?? 0;
+			double headerElementHeight = _headerElement?.ActualHeight ?? 0;
+			double desiredHeaderHeight = _headerElement?.DesiredSize.Height ?? 0;
+			double fallbackHeight = GetThemeHeaderMinHeight();
+			double headerHeight = Math.Max(headerItemHeight, Math.Max(headerElementHeight, Math.Max(desiredHeaderHeight, fallbackHeight)));
+
+			return headerHeight;
+		}
+
+		double GetThemeHeaderMinHeight() =>
+			TryGetDoubleResource("GridViewHeaderItemMinHeight");
+
+		double TryGetDoubleResource(string resourceKey)
+		{
+			if (UWPApp.Current.Resources.TryGetValue(resourceKey, out var value) && value is double dimension)
+			{
+				return dimension;
+			}
+
+			return 0;
 		}
 	}
 }

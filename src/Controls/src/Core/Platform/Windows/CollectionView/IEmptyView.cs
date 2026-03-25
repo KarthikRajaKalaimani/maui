@@ -7,6 +7,8 @@ namespace Microsoft.Maui.Controls.Platform
 	internal interface IEmptyView
 	{
 		WVisibility EmptyViewVisibility { get; set; }
+		void UpdateHeaderMargin();
+		void SetHeader(FrameworkElement headerElement);
 		void SetEmptyView(FrameworkElement emptyView, View formsEmptyView);
 	}
 }
