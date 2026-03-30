@@ -79,7 +79,6 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 		SearchHandlerAppearanceTracker? _searchHandlerAppearanceTracker;
 		IFontManager _fontManager;
 		bool _isVisiblePage;
-
 		BackButtonBehavior? BackButtonBehavior { get; set; }
 		UINavigationItem? NavigationItem { get; set; }
 		IMauiContext? MauiContext => Page?.FindMauiContext() ?? _context?.Shell.FindMauiContext();
@@ -735,9 +734,7 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 		public class TitleViewContainer : UIContainerView
 		{
-#nullable disable
 			public TitleViewContainer(View view) : base(view)
-#nullable restore
 			{
 				MatchHeight = true;
 
@@ -748,6 +745,7 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				{
 					TranslatesAutoresizingMaskIntoConstraints = true;
 					AutoresizingMask = UIViewAutoresizing.FlexibleHeight | UIViewAutoresizing.FlexibleWidth;
+					ClipsToBounds = false;
 				}
 				else if (OperatingSystem.IsIOSVersionAtLeast(11) || OperatingSystem.IsTvOSVersionAtLeast(11))
 				{
@@ -759,6 +757,12 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 					TranslatesAutoresizingMaskIntoConstraints = true;
 					AutoresizingMask = UIViewAutoresizing.FlexibleHeight | UIViewAutoresizing.FlexibleWidth;
 				}
+
+				if (OperatingSystem.IsIOSVersionAtLeast(11) || OperatingSystem.IsMacCatalystVersionAtLeast(11))
+				{
+					ClipsToBounds = false;
+				}
+
 			}
 
 			/// <summary>
@@ -793,6 +797,12 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			public override void LayoutSubviews()
 			{
 				UpdateFrame(Superview);
+
+				if (TryArrangeUsingNavigationBar())
+				{
+					return;
+				}
+
 				base.LayoutSubviews();
 			}
 
@@ -804,12 +814,82 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 			void UpdateFrame(UIView? newSuper)
 			{
-				if (newSuper is not null && newSuper.Bounds != CGRect.Empty)
+				var navigationBar = FindNavigationBar(newSuper);
+
+				if ((OperatingSystem.IsIOSVersionAtLeast(26) || OperatingSystem.IsMacCatalystVersionAtLeast(26)) &&
+					navigationBar is not null && navigationBar.Bounds != CGRect.Empty)
 				{
+					Width = navigationBar.Bounds.Width;
+					Height = navigationBar.Bounds.Height;
+				}
+				else if (newSuper is not null && newSuper.Bounds != CGRect.Empty)
+				{
+					Width = newSuper.Bounds.Width;
 					Height = newSuper.Bounds.Height;
 				}
 			}
 
+			bool TryArrangeUsingNavigationBar()
+			{
+				var navigationBar = FindNavigationBar(Superview);
+				if (navigationBar is null || navigationBar.Bounds == CGRect.Empty)
+				{
+					return false;
+				}
+
+				var useNavigationBarHeight = OperatingSystem.IsIOSVersionAtLeast(26) || OperatingSystem.IsMacCatalystVersionAtLeast(26);
+				var originInNavBar = ConvertPointToView(CGPoint.Empty, navigationBar);
+				nfloat width;
+				nfloat height;
+				nfloat xOffset;
+				nfloat yOffset;
+
+				if (useNavigationBarHeight)
+				{
+					var currentWidth = Bounds.Width > 0 ? Bounds.Width : Frame.Width;
+					var leadingExpansion = (nfloat)Math.Min((double)originInNavBar.X, (double)navigationBar.LayoutMargins.Left);
+					var trailingAvailable = (nfloat)Math.Max(0, (double)(navigationBar.Bounds.Width - (originInNavBar.X + currentWidth)));
+					var trailingExpansion = (nfloat)Math.Min((double)trailingAvailable, (double)navigationBar.LayoutMargins.Right);
+					width = (nfloat)Math.Min((double)navigationBar.Bounds.Width, (double)(currentWidth + leadingExpansion + trailingExpansion));
+					height = navigationBar.Bounds.Height;
+					xOffset = leadingExpansion;
+					yOffset = originInNavBar.Y;
+				}
+				else
+				{
+					return false;
+				}
+
+				if (width <= 0 || height <= 0)
+				{
+					return false;
+				}
+
+				Width = width;
+				Height = height;
+
+				if (View is IView view)
+				{
+					view.Measure(width, height);
+					view.Arrange(new Rect(-xOffset, -yOffset, width, height));
+					return true;
+				}
+
+				return false;
+			}
+
+			static UINavigationBar? FindNavigationBar(UIView? view)
+			{
+				while (view is not null)
+				{
+					if (view is UINavigationBar navigationBar)
+						return navigationBar;
+
+					view = view.Superview;
+				}
+
+				return null;
+			}
 			public override CGSize IntrinsicContentSize => UILayoutFittingExpandedSize;
 
 			public override CGSize SizeThatFits(CGSize size)
