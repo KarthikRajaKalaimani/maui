@@ -77,7 +77,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			source.SetResult();
 		}
 
-		void RequestNavigation(NavigationRequest navigationRequest)
+		async void RequestNavigation(NavigationRequest navigationRequest)
 		{
 			if (CurrentNavigationRequest != null || _navigationSource != null)
 				throw new InvalidOperationException("Already Processing Navigation");
@@ -85,7 +85,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 
 			_navigationSource = new TaskCompletionSource();
 			CurrentNavigationRequest = navigationRequest;
-
+			await Task.Delay(10);
 			CompleteCurrentNavigation();
 		}
 
