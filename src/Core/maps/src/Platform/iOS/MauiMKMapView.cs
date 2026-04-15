@@ -455,21 +455,22 @@ namespace Microsoft.Maui.Maps.Platform
 
 		IMapPin GetPinForAnnotation(IMKAnnotation annotation)
 		{
-			IMapPin targetPin = null!;
 			_handlerRef.TryGetTarget(out IMapHandler? handler);
-			IMap map = handler?.VirtualView!;
+			var pins = handler?.VirtualView?.Pins;
 
-			for (int i = 0; i < map.Pins.Count; i++)
+			if (pins is null || pins.Count == 0)
+				return null!;
+
+			for (int i = 0; i < pins.Count; i++)
 			{
-				var pin = map.Pins[i];
+				var pin = pins[i];
 				if ((pin?.MarkerId as IMKAnnotation) == annotation)
 				{
-					targetPin = pin;
-					break;
+					return pin;
 				}
 			}
 
-			return targetPin;
+			return null!;
 		}
 
 		void AttachGestureToPin(MKAnnotationView mapPin, IMKAnnotation annotation)
@@ -564,8 +565,12 @@ namespace Microsoft.Maui.Maps.Platform
 				.Clicked();
 			}
 
+			var overlays = mauiMkMapView.Overlays;
+			if (overlays?.Length is not > 0)
+				return;
+
 			// Hit-test overlays in order: Circle > Polygon > Polyline (first match wins)
-			foreach (var overlay in mauiMkMapView.Overlays)
+			foreach (var overlay in overlays)
 			{
 				if (overlay is MKCircle circle)
 				{
