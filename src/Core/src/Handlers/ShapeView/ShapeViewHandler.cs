@@ -27,7 +27,10 @@ namespace Microsoft.Maui.Handlers
 			[nameof(IShapeView.StrokeDashOffset)] = MapStrokeDashOffset,
 			[nameof(IShapeView.StrokeLineCap)] = MapStrokeLineCap,
 			[nameof(IShapeView.StrokeLineJoin)] = MapStrokeLineJoin,
-			[nameof(IShapeView.StrokeMiterLimit)] = MapStrokeMiterLimit
+			[nameof(IShapeView.StrokeMiterLimit)] = MapStrokeMiterLimit,
+#if WINDOWS
+			[nameof(IView.InputTransparent)] = MapInputTransparent,
+#endif
 		};
 
 		public static CommandMapper<IShapeView, IShapeViewHandler> CommandMapper = new(ViewCommandMapper)

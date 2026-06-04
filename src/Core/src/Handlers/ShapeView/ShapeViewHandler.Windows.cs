@@ -61,5 +61,19 @@ namespace Microsoft.Maui.Handlers
 		{
 			handler.PlatformView?.InvalidateShape(shapeView);
 		}
+
+		public static new void MapInputTransparent(IShapeViewHandler handler, IShapeView shapeView)
+		{
+			// When InputTransparent=false, GesturePlatformManager has already set IsHitTestVisible
+			// on the platform view based on whether gesture recognizers are attached
+			// (false for decorative shapes with no GRs, true when GRs are present).
+			// Calling the base UpdateInputTransparent would reset IsHitTestVisible=true,
+			// causing shapes like Line to block pointer events on underlying controls.
+			// Only propagate the InputTransparent when it is explicitly set to true.
+			if (shapeView.InputTransparent && handler.PlatformView is { } platformView)
+			{
+				platformView.IsHitTestVisible = false;
+			}
+		}
 	}
 }
