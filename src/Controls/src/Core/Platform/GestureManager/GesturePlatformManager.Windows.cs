@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui;
 using Microsoft.Maui.Controls.Internals;
 using Microsoft.Maui.Graphics;
 using Microsoft.UI.Xaml;
@@ -954,6 +955,14 @@ namespace Microsoft.Maui.Controls.Platform
 
 			ClearContainerEventHandlers();
 			UpdateDragAndDropGestureRecognizers();
+
+			// For shape views, let touches pass through when no gesture recognizers are attached.
+			// Shapes (e.g. Line, Rectangle) are often used as decorative overlays and should not
+			// block pointer events on underlying controls unless they have explicit interactions.
+			if (_handler.VirtualView is IShapeView shapeView)
+			{
+				_container.IsHitTestVisible = !shapeView.InputTransparent && gestures.Count > 0;
+			}
 
 			var children = (view as IGestureController)?.GetChildElements(Point.Zero);
 
