@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Maui.Controls.Sample.Issues.Issue27126"
+             Title="Issue 27126">
+
+    <!--
+        Regression test for https://github.com/dotnet/maui/issues/27126
+        A Line with Y1=Y2=250 (Stretch.None) gets a native frame of (0,0,width,250).
+        Without the fix this frame silently absorbs all touches, blocking Label1 and Label2.
+        With the fix MauiShapeView.HitTest returns null when no gesture recognizers are
+        attached, so touches fall through to the controls beneath.
+    -->
+    <AbsoluteLayout>
+
+        <!-- Label 1 at Y=60 — inside the Line's native frame (0,0,width,250) -->
+        <Label Text="Label 1 - Tap Me"
+               AutomationId="Label1"
+               BackgroundColor="LightGreen"
+               HorizontalTextAlignment="Center"
+               VerticalTextAlignment="Center"
+               AbsoluteLayout.LayoutBounds="50, 60, 300, 44">
+            <Label.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnLabel1Tapped" />
+            </Label.GestureRecognizers>
+        </Label>
+
+        <!-- Label 2 at Y=130 — also inside the Line's native frame -->
+        <Label Text="Label 2 - Tap Me"
+               AutomationId="Label2"
+               BackgroundColor="LightBlue"
+               HorizontalTextAlignment="Center"
+               VerticalTextAlignment="Center"
+               AbsoluteLayout.LayoutBounds="50, 130, 300, 44">
+            <Label.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnLabel2Tapped" />
+            </Label.GestureRecognizers>
+        </Label>
+
+        <!-- Line with no explicit LayoutBounds: positioned at (0,0) with
+             measured size (400,250). Its native frame covers Labels 1 and 2.
+             No gesture recognizers — the fix makes it pass touches through. -->
+        <Line X1="0" Y1="250" X2="400" Y2="250"
+              Stroke="Red" StrokeThickness="2" />
+
+        <!-- Status label at Y=280 — below the Line's frame, always reachable -->
+        <Label x:Name="TapResultLabel"
+               AutomationId="TapResult"
+               Text="None"
+               HorizontalTextAlignment="Center"
+               AbsoluteLayout.LayoutBounds="50, 280, 300, 44" />
+
+    </AbsoluteLayout>
+</ContentPage>
