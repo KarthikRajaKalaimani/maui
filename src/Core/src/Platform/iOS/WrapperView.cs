@@ -129,22 +129,22 @@ namespace Microsoft.Maui.Platform
 			CrossPlatformLayout?.CrossPlatformArrange(Bounds.ToRectangle());
 		}
 
+		// When true, the WrapperView passes touches through to views behind it
+		// when no child accepts the touch and there are no gesture recognizers.
+		// Set this for controls whose native view is purely visual (e.g., shapes).
+		internal bool IsInteractionTransparent { get; set; }
+
 		public override UIView? HitTest(CGPoint point, UIEvent? uievent)
 		{
-			// First check if the child view wants the touch
 			var result = base.HitTest(point, uievent);
-			
-			// If this WrapperView has gesture recognizers, we need to return ourselves
-			// so the gesture recognizers can process the touch
-			if (result != null && GestureRecognizers != null && GestureRecognizers.Length > 0)
-				return this;
-			
-			// If the result is this WrapperView itself (not a child),
-			// it means the touch landed in the wrapper but not in any child.
-			// In this case, return null to let touches pass through to views behind.
-			if (result == this)
+
+			// When no child accepted the touch and we have been marked as interaction-transparent
+			// (e.g., shape views) with no gesture recognizers to handle the touch ourselves,
+			// return null so the touch falls through to views behind this container.
+			if (result == this && IsInteractionTransparent &&
+				(GestureRecognizers == null || GestureRecognizers.Length == 0))
 				return null;
-			
+
 			return result;
 		}
 

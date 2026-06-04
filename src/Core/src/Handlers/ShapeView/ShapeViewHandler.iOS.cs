@@ -1,4 +1,5 @@
 ﻿using Microsoft.Maui.Graphics;
+using Microsoft.Maui.Platform;
 
 namespace Microsoft.Maui.Handlers
 {
@@ -10,6 +11,16 @@ namespace Microsoft.Maui.Handlers
 		public override bool NeedsContainer =>
 			VirtualView?.Background != null ||
 			base.NeedsContainer;
+
+		protected override void SetupContainer()
+		{
+			base.SetupContainer();
+
+			// Shapes are purely visual; allow touches to pass through the container
+			// to views beneath when no gesture recognizers are present.
+			if (ContainerView is WrapperView wrapper)
+				wrapper.IsInteractionTransparent = true;
+		}
 
 		public static void MapShape(IShapeViewHandler handler, IShapeView shapeView)
 		{
