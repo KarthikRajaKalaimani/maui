@@ -1,5 +1,7 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using CoreGraphics;
+using Foundation;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Handlers;
 using Microsoft.Maui.Controls.Shapes;
@@ -27,16 +29,21 @@ namespace Microsoft.Maui.DeviceTests
 		// Regression test for https://github.com/dotnet/maui/issues/27126
 		// A Line (MauiShapeView) with no gesture recognizers should return null from HitTest
 		// so touches pass through to controls placed beneath the shape.
-		[Fact(DisplayName = "Line HitTest passes through when no gesture recognizers")]
+		[Fact(DisplayName = "Line HitTest passes through when no gesture recognizers or interactions")]
 		public async Task LineHitTestPassesThroughWithNoGestureRecognizers()
 		{
 			SetupBuilder();
 
 			var line = new Line
 			{
-				X1 = 0, Y1 = 0, X2 = 100, Y2 = 0,
-				WidthRequest = 100, HeightRequest = 10,
-				Stroke = Colors.Black, StrokeThickness = 2
+				X1 = 0,
+				Y1 = 0,
+				X2 = 100,
+				Y2 = 0,
+				WidthRequest = 100,
+				HeightRequest = 10,
+				Stroke = Colors.Black,
+				StrokeThickness = 2
 			};
 
 			await AttachAndRun<LineHandler>(line, handler =>
@@ -47,7 +54,7 @@ namespace Microsoft.Maui.DeviceTests
 				// Ensure the platform view has a frame so HitTest can find hits within it.
 				platformView.Frame = new CoreGraphics.CGRect(0, 0, 100, 10);
 
-				// With no gesture recognizers the shape should pass the touch through (return null).
+				// With no gesture recognizers or interactions the shape should pass the touch through (return null).
 				var hitResult = platformView.HitTest(new CGPoint(50, 5), null);
 				Assert.Null(hitResult);
 
@@ -63,9 +70,14 @@ namespace Microsoft.Maui.DeviceTests
 
 			var line = new Line
 			{
-				X1 = 0, Y1 = 0, X2 = 100, Y2 = 0,
-				WidthRequest = 100, HeightRequest = 10,
-				Stroke = Colors.Black, StrokeThickness = 2
+				X1 = 0,
+				Y1 = 0,
+				X2 = 100,
+				Y2 = 0,
+				WidthRequest = 100,
+				HeightRequest = 10,
+				Stroke = Colors.Black,
+				StrokeThickness = 2
 			};
 
 			await AttachAndRun<LineHandler>(line, handler =>
@@ -104,9 +116,14 @@ namespace Microsoft.Maui.DeviceTests
 
 			var line = new Line
 			{
-				X1 = 0, Y1 = 0, X2 = 100, Y2 = 0,
-				WidthRequest = 100, HeightRequest = 10,
-				Stroke = Colors.Black, StrokeThickness = 2,
+				X1 = 0,
+				Y1 = 0,
+				X2 = 100,
+				Y2 = 0,
+				WidthRequest = 100,
+				HeightRequest = 10,
+				Stroke = Colors.Black,
+				StrokeThickness = 2,
 				Background = new SolidColorBrush(Colors.Transparent) // forces NeedsContainer=true
 			};
 
@@ -128,6 +145,58 @@ namespace Microsoft.Maui.DeviceTests
 
 				return Task.CompletedTask;
 			});
+		}
+
+		// A Line (MauiShapeView) with a drag interaction should still receive the touch (return self).
+		// Drag/Drop gesture recognizers are wired via UIDragInteraction, not UIGestureRecognizer.
+		[Fact(DisplayName = "Line HitTest returns self when drag interaction is attached")]
+		public async Task LineHitTestReturnsSelfWithDragInteraction()
+		{
+			SetupBuilder();
+
+			var line = new Line
+			{
+				X1 = 0,
+				Y1 = 0,
+				X2 = 100,
+				Y2 = 0,
+				WidthRequest = 100,
+				HeightRequest = 10,
+				Stroke = Colors.Black,
+				StrokeThickness = 2
+			};
+
+			await AttachAndRun<LineHandler>(line, handler =>
+			{
+				var platformView = handler.PlatformView;
+				Assert.NotNull(platformView);
+
+				platformView.Frame = new CoreGraphics.CGRect(0, 0, 100, 10);
+
+				// Simulate a UIDragInteraction being attached (as MAUI does for DragGestureRecognizer).
+				var dragDelegate = new MockDragInteractionDelegate();
+				var dragInteraction = new UIDragInteraction(dragDelegate);
+				platformView.AddInteraction(dragInteraction);
+
+				try
+				{
+					// With a drag interaction present the shape must not pass through (return self).
+					var hitResult = platformView.HitTest(new CGPoint(50, 5), null);
+					Assert.NotNull(hitResult);
+				}
+				finally
+				{
+					platformView.RemoveInteraction(dragInteraction);
+				}
+
+				return Task.CompletedTask;
+			});
+		}
+
+		private class MockDragInteractionDelegate : NSObject, IUIDragInteractionDelegate
+		{
+			public UIDragItem[] GetItemsForBeginningSession(UIDragInteraction interaction, IUIDragSession session)
+				=> Array.Empty<UIDragItem>();
 		}
 	}
 }

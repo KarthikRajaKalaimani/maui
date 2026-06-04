@@ -18,9 +18,12 @@ namespace Microsoft.Maui.Platform
 		{
 			var result = base.HitTest(point, uievent);
 
-			// Shape views are purely visual; when no gesture recognizers are attached,
-			// pass touches through so controls beneath the shape remain interactive.
-			if (result == this && (GestureRecognizers == null || GestureRecognizers.Length == 0))
+			// Shape views are purely visual; when no gesture recognizers or interactions
+			// (e.g. drag/drop via UIDragInteraction) are attached, pass touches through
+			// so controls beneath the shape remain interactive.
+			if (result == this
+				&& (GestureRecognizers == null || GestureRecognizers.Length == 0)
+				&& (Interactions == null || Interactions.Length == 0))
 				return null;
 
 			return result;

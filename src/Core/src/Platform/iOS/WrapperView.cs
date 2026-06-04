@@ -139,10 +139,12 @@ namespace Microsoft.Maui.Platform
 			var result = base.HitTest(point, uievent);
 
 			// When no child accepted the touch and we have been marked as interaction-transparent
-			// (e.g., shape views) with no gesture recognizers to handle the touch ourselves,
-			// return null so the touch falls through to views behind this container.
-			if (result == this && IsInteractionTransparent &&
-				(GestureRecognizers == null || GestureRecognizers.Length == 0))
+			// (e.g., shape views) with no gesture recognizers or interactions (e.g. drag/drop via
+			// UIDragInteraction) to handle the touch ourselves, return null so the touch falls
+			// through to views behind this container.
+			if (result == this && IsInteractionTransparent
+				&& (GestureRecognizers == null || GestureRecognizers.Length == 0)
+				&& (Interactions == null || Interactions.Length == 0))
 				return null;
 
 			return result;
