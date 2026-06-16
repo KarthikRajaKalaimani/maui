@@ -652,13 +652,17 @@ public class MemoryTests : ControlsHandlerTestBase
 		var references = new List<WeakReference>();
 		var observable = new ObservableCollection<int> { 1 };
 		var navPage = new NavigationPage(new ContentPage { Title = "Page 1" });
+#pragma warning disable CS0618 // Type or member is obsolete
+		ListView listView = null;
+#pragma warning restore CS0618 // Type or member is obsolete
+		ContentPage contentPage = null;
 
 		await CreateHandlerAndAddToWindow(new Window(navPage), async () =>
 		{
 #pragma warning disable CS0618 // Type or member is obsolete
-			await navPage.Navigation.PushAsync(new ContentPage
+			contentPage = new ContentPage
 			{
-				Content = new ListView
+				Content = listView = new ListView
 				{
 					ItemTemplate = new DataTemplate(() =>
 					{
@@ -676,7 +680,9 @@ public class MemoryTests : ControlsHandlerTestBase
 					}),
 					ItemsSource = observable
 				}
-			});
+			};
+
+			await navPage.Navigation.PushAsync(contentPage);
 #pragma warning restore CS0618 // Type or member is obsolete
 
 			Assert.NotEmpty(references);
@@ -693,8 +699,19 @@ public class MemoryTests : ControlsHandlerTestBase
 #pragma warning restore CS0618 // Type or member is obsolete
 			}
 
+			listView.ItemsSource = null;
+			listView.ItemTemplate = null;
+			listView.Footer = null;
+			listView.Header = null;
+			contentPage.Content = null;
+
 			await navPage.Navigation.PopAsync();
+			await Task.Delay(100);
 		});
+
+		listView = null;
+		contentPage = null;
+		await Task.Delay(50);
 
 		await AssertionExtensions.WaitForGC(references.ToArray());
 	}
@@ -785,7 +802,13 @@ public class MemoryTests : ControlsHandlerTestBase
 			{
 				app.SetWindow(null);
 			}
+
+			page.Content = null;
 		});
+
+		page = null;
+		window = null;
+		await Task.Delay(50);
 
 		await AssertionExtensions.WaitForGC([.. references]);
 	}

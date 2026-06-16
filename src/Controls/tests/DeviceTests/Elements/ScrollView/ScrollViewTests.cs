@@ -125,8 +125,8 @@ namespace Microsoft.Maui.DeviceTests
 			WeakReference handlerReference = null;
 			WeakReference platformReference = null;
 
-			var view = new Microsoft.Maui.Controls.ScrollView();
-			var page = new ContentPage { Content = view };
+			Microsoft.Maui.Controls.ScrollView view = new();
+			ContentPage page = new() { Content = view };
 			await CreateHandlerAndAddToWindow(page, () =>
 			{
 				viewReference = new(view);
@@ -135,6 +135,9 @@ namespace Microsoft.Maui.DeviceTests
 				page.Content = null;
 			});
 
+			view = null;
+			page = null;
+			await Task.Delay(50);
 
 			await AssertionExtensions.WaitForGC(viewReference, handlerReference, platformReference);
 		}

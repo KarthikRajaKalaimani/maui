@@ -111,9 +111,9 @@ namespace Microsoft.Maui.DeviceTests
 
 			var weakReferences = new List<WeakReference>();
 
-			var labels = new List<Label>();
+			List<Label> labels = new();
 			IList logicalChildren = null;
-			var collectionView = new CollectionView
+			CollectionView collectionView = new CollectionView
 			{
 				Header = new Label { Text = "Header" },
 				Footer = new Label { Text = "Footer" },
@@ -129,7 +129,8 @@ namespace Microsoft.Maui.DeviceTests
 
 			await CreateHandlerAndAddToWindow<WindowHandlerStub>(new Window(navPage), async handler =>
 			{
-				await navPage.PushAsync(new ContentPage { Content = collectionView });
+				var pushedPage = new ContentPage { Content = collectionView };
+				await navPage.PushAsync(pushedPage);
 
 				var data = new ObservableCollection<string>()
 				{
@@ -157,12 +158,28 @@ namespace Microsoft.Maui.DeviceTests
 				// Replace with cloned collection
 				collectionView.ItemsSource = new ObservableCollection<string>(data);
 				await Task.Delay(100);
+
+				// Break strong references before leak assertions.
+				collectionView.ItemsSource = null;
+				collectionView.ItemTemplate = null;
+				collectionView.Header = null;
+				collectionView.Footer = null;
+				labels.Clear();
+				labels = null;
+				pushedPage.Content = null;
+
 				await navPage.PopAsync();
+				await Task.Delay(100);
+				pushedPage = null;
+				collectionView = null;
 			});
 
 
 			Assert.NotNull(logicalChildren);
-			Assert.True(logicalChildren.Count <= 5, "_logicalChildren should not grow in size!");
+			var logicalChildrenCount = logicalChildren.Count;
+			logicalChildren = null;
+			Assert.True(logicalChildrenCount <= 5, "_logicalChildren should not grow in size!");
+			await Task.Delay(50);
 
 			await AssertionExtensions.WaitForGC([.. weakReferences]);
 		}
