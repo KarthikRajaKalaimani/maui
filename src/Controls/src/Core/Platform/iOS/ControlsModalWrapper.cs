@@ -59,7 +59,7 @@ namespace Microsoft.Maui.Controls.Platform
 				}
 			}
 
-			UpdateBackgroundColor();
+			UpdateBackground();
 			_ = modal?.ViewController?.View ?? throw new InvalidOperationException("View Controller Not Initialized on Modal Page");
 
 			View!.AddSubview(modal.ViewController.View);
@@ -166,7 +166,7 @@ namespace Microsoft.Maui.Controls.Platform
 		public override void ViewWillAppear(bool animated)
 		{
 			if (!_isDisposed)
-				UpdateBackgroundColor();
+				UpdateBackground();
 
 			base.ViewWillAppear(animated);
 		}
@@ -206,10 +206,10 @@ namespace Microsoft.Maui.Controls.Platform
 		void OnModalPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
 			if (e.PropertyName == Page.BackgroundProperty.PropertyName)
-				UpdateBackgroundColor();
+				UpdateBackground();
 		}
 
-		void UpdateBackgroundColor()
+		void UpdateBackground()
 		{
 			if (_isDisposed)
 				return;
