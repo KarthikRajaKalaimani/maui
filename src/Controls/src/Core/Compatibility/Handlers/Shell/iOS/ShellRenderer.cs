@@ -353,13 +353,9 @@ namespace Microsoft.Maui.Controls.Handlers.Compatibility
 
 		protected virtual void UpdateBackgroundColor()
 		{
-#pragma warning disable MAUI0003, CS0618 // BackgroundColor — Compatibility ShellRenderer backward compatibility
-			var color = Shell.BackgroundColor?.ToPlatform();
-#pragma warning restore MAUI0003, CS0618
-			if (color == null)
-				color = Microsoft.Maui.Platform.ColorExtensions.BackgroundColor;
-
-			FlyoutRenderer.View.BackgroundColor = color;
+			FlyoutRenderer.View.UpdateBackground(Shell.Background);
+			if (Brush.IsNullOrEmpty(Shell.Background))
+				FlyoutRenderer.View.BackgroundColor = Microsoft.Maui.Platform.ColorExtensions.BackgroundColor;
 		}
 
 		void SetupCurrentShellItem()
