@@ -10,7 +10,6 @@ using AndroidX.AppCompat.App;
 using AndroidX.AppCompat.Widget;
 using AndroidX.CoordinatorLayout.Widget;
 using AndroidX.Core.View;
-using AndroidX.Core.View.Accessibility;
 using AndroidX.Fragment.App;
 using AndroidX.ViewPager.Widget;
 using AndroidX.ViewPager2.Widget;
@@ -78,7 +77,7 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 		IShellToolbarTracker _toolbarTracker;
 		ViewPager2 _viewPager;
 		bool _disposed;
-		static readonly SingleTabViewPagerAccessibilityDelegate _singleTabViewPagerAccessibilityDelegate = new();
+		ItemViewAccessibilityLayoutListener _a11yLayoutListener;
 		IShellController ShellController => _shellContext.Shell;
 		public event EventHandler AnimationFinished;
 		Fragment IShellObservableFragment.Fragment => this;
@@ -199,6 +198,10 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 		void Destroy()
 		{
+			// Remove the a11y layout listener BEFORE tearing down ViewPager2 so we can still
+			// reach the RecyclerView's ViewTreeObserver.
+			RemoveAccessibilityLayoutListener();
+
 			if (_rootView != null)
 			{
 				// Clean up the coordinator layout and local listener first
@@ -317,140 +320,61 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			}
 		}
 
-		bool? _singleTabAccessibilityModeActive;
-
 		void UpdateTablayoutVisibility()
 		{
 			_tablayout.Visibility = (SectionController.GetItems().Count > 1) ? ViewStates.Visible : ViewStates.Gone;
-			var recyclerView = GetViewPagerRecyclerView();
-
-			bool singleTab = _tablayout.Visibility == ViewStates.Gone;
-			_singleTabAccessibilityModeActive = singleTab;
-
-			if (singleTab)
+			if (_tablayout.Visibility == ViewStates.Gone)
 			{
 				SetViewPager2UserInputEnabled(false);
-
-				// We also strip the pager's own swipe/scroll accessibility
-				// actions so TalkBack doesn't announce a "swipe to next page" affordance.
-				ViewCompat.SetAccessibilityDelegate(_viewPager, _singleTabViewPagerAccessibilityDelegate);
 			}
 			else
 			{
 				SetViewPager2UserInputEnabled(true);
-
-				ViewCompat.SetAccessibilityDelegate(_viewPager, null);
 			}
 
-			// ViewPager2 (and its internal RecyclerView) default to being focusable and
-			// accessibility-important. Because of that, TalkBack treats ViewPager2 itself as
-			// the nearest "important" accessibility ancestor for everything inside it, which
-			// causes ALL descendant content (e.g. multiple Labels inside a VerticalStackLayout)
-			// to be merged into a single accessibility focus/announcement instead of each
-			// descendant being focused individually. This happens regardless of tab count.
-			// Excluding ViewPager2 and its RecyclerView from the accessibility tree (without
-			// hiding their descendants) lets TalkBack focus each descendant Label individually.
-			// This does not disable touch swipe between tabs (SetViewPager2UserInputEnabled
-			// controls that); it only removes ViewPager2/RecyclerView from being treated as an
-			// accessibility-focusable/important ancestor.
+			// Exclude ViewPager2 and its internal RecyclerView from the accessibility tree so
+			// TalkBack does not treat them as a focus boundary that merges all descendant text
+			// (multiple Labels in a VerticalStackLayout) into a single accessibility announcement.
+			// See https://github.com/dotnet/maui/issues/36304.
+			// This does NOT remove descendants — only the pager and its RecyclerView themselves —
+			// so each Label remains individually focusable by TalkBack.
 			_viewPager.Focusable = false;
 			_viewPager.ImportantForAccessibility = ImportantForAccessibility.No;
 
+			var recyclerView = GetViewPagerRecyclerView();
 			if (recyclerView != null)
+			{
 				recyclerView.Focusable = false;
 
-			// RecyclerView's item view (the actual page container hosting the Fragment's content)
-			// defaults to ImportantForAccessibility.Yes. Combined with non-actionable/non-focusable
-			// descendant Labels, this is another merge point: Android/TalkBack can treat the item
-			// view itself as the accessibility node and fold all descendant text into it. Setting
-			// the item view to "No" (not "NoHideDescendants") excludes only the item view itself
-			// from the accessibility tree, letting focus pass through to each descendant
-			// individually. Apply to the currently attached item view now, and to any future item
-			// view the RecyclerView attaches (item views are recycled/recreated).
-			ApplyImportantForAccessibilityToAttachedItemViews(recyclerView);
-			EnsureItemViewAttachListener(recyclerView);
+				// The RecyclerView's item view (the direct container of the fragment's content)
+				// is another merge point. Item views are recycled/replaced under adapter changes,
+				// so we can't set the flag once at startup and be done — a newly attached item
+				// view has ImportantForAccessibility=Yes by default. Use a lightweight global
+				// layout listener that re-applies the flag on every layout pass. The listener
+				// only holds a WeakReference to the RecyclerView (no reference to this renderer),
+				// so it cannot extend renderer lifetime; it is explicitly removed in Destroy().
+				EnsureAccessibilityLayoutListener(recyclerView);
+			}
 		}
 
-		void ApplyImportantForAccessibilityToAttachedItemViews(AndroidX.RecyclerView.Widget.RecyclerView recyclerView)
+		void EnsureAccessibilityLayoutListener(AndroidX.RecyclerView.Widget.RecyclerView recyclerView)
 		{
-			if (recyclerView == null)
+			if (_a11yLayoutListener != null)
+			{
+				// Re-apply immediately (in case the current item view was just replaced during
+				// an adapter change and no layout pass has happened yet).
+				_a11yLayoutListener.MarkAttachedItemViews();
 				return;
-
-			for (int i = 0; i < recyclerView.ChildCount; i++)
-			{
-				var itemView = recyclerView.GetChildAt(i);
-				if (itemView != null)
-				{
-					itemView.ImportantForAccessibility = ImportantForAccessibility.No;
-					MarkIntermediateContainersNotImportant(itemView);
-				}
-			}
-		}
-
-		// Marks every intermediate container ViewGroup between the RecyclerView item view and the
-		// actual leaf content (Labels, etc.) as ImportantForAccessibility.No. Even after excluding
-		// the item view itself from the accessibility tree, TalkBack can still merge descendant
-		// text into whichever ancestor ViewGroup (ShellPageContainer / ContentViewGroup /
-		// LayoutViewGroup) is the first one Android's default "Auto" resolution treats as
-		// accessibility-important. Excluding all of these pass-through containers (but not the
-		// leaf content views) lets TalkBack focus each leaf view (e.g. each Label) individually.
-		static void MarkIntermediateContainersNotImportant(AView view)
-		{
-			if (view is ViewGroup group)
-			{
-				// Only recurse through single-child "pass-through" containers. A container with
-				// multiple children (e.g. a VerticalStackLayout hosting several Labels) is where
-				// the actual leaf content lives, so stop there and leave those children untouched.
-				if (group.ChildCount == 1)
-				{
-					group.ImportantForAccessibility = ImportantForAccessibility.No;
-					MarkIntermediateContainersNotImportant(group.GetChildAt(0));
-				}
-				else
-				{
-					group.ImportantForAccessibility = ImportantForAccessibility.No;
-				}
-			}
-		}
-
-		void EnsureItemViewAttachListener(AndroidX.RecyclerView.Widget.RecyclerView recyclerView)
-		{
-			if (recyclerView == null || recyclerView == _recyclerViewWithAttachListener)
-				return;
-
-			if (_recyclerViewWithAttachListener != null && _itemViewAttachListener != null)
-				_recyclerViewWithAttachListener.RemoveOnChildAttachStateChangeListener(_itemViewAttachListener);
-
-			_itemViewAttachListener ??= new ItemViewAccessibilityAttachListener(this);
-			recyclerView.AddOnChildAttachStateChangeListener(_itemViewAttachListener);
-			_recyclerViewWithAttachListener = recyclerView;
-		}
-
-		AndroidX.RecyclerView.Widget.RecyclerView _recyclerViewWithAttachListener;
-		ItemViewAccessibilityAttachListener _itemViewAttachListener;
-
-		class ItemViewAccessibilityAttachListener : Java.Lang.Object, AndroidX.RecyclerView.Widget.RecyclerView.IOnChildAttachStateChangeListener
-		{
-			readonly ShellSectionRenderer _owner;
-
-			public ItemViewAccessibilityAttachListener(ShellSectionRenderer owner) => _owner = owner;
-
-			public void OnChildViewAttachedToWindow(AView view)
-			{
-				// Item views are recycled/recreated by the RecyclerView, so re-apply the fix
-				// to each newly attached item view (the Fragment's content may not be inflated
-				// into it yet at this point; MarkIntermediateContainersNotImportant recurses
-				// through whatever is currently attached).
-				if (view != null)
-				{
-					view.ImportantForAccessibility = ImportantForAccessibility.No;
-					MarkIntermediateContainersNotImportant(view);
-				}
 			}
 
-			public void OnChildViewDetachedFromWindow(AView view)
-			{
-			}
+			_a11yLayoutListener = new ItemViewAccessibilityLayoutListener(recyclerView);
+			var vto = recyclerView.ViewTreeObserver;
+			if (vto != null && vto.IsAlive)
+				vto.AddOnGlobalLayoutListener(_a11yLayoutListener);
+
+			// Apply once now so the very first item view (already attached before the first
+			// layout pass fires the listener) is marked immediately for the test / initial focus.
+			_a11yLayoutListener.MarkAttachedItemViews();
 		}
 
 		// ViewPager2 always has exactly one direct child: its internal RecyclerView.
@@ -460,6 +384,52 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				return null;
 
 			return _viewPager.GetChildAt(0) as AndroidX.RecyclerView.Widget.RecyclerView;
+		}
+
+		void RemoveAccessibilityLayoutListener()
+		{
+			if (_a11yLayoutListener == null)
+				return;
+
+			var rv = _a11yLayoutListener.TryGetRecyclerView();
+			if (rv != null)
+			{
+				var vto = rv.ViewTreeObserver;
+				if (vto != null && vto.IsAlive)
+					vto.RemoveOnGlobalLayoutListener(_a11yLayoutListener);
+			}
+
+			_a11yLayoutListener.Dispose();
+			_a11yLayoutListener = null;
+		}
+
+		sealed class ItemViewAccessibilityLayoutListener : Java.Lang.Object, ViewTreeObserver.IOnGlobalLayoutListener
+		{
+			readonly WeakReference<AndroidX.RecyclerView.Widget.RecyclerView> _rvRef;
+
+			public ItemViewAccessibilityLayoutListener(AndroidX.RecyclerView.Widget.RecyclerView rv)
+			{
+				_rvRef = new WeakReference<AndroidX.RecyclerView.Widget.RecyclerView>(rv);
+			}
+
+			public AndroidX.RecyclerView.Widget.RecyclerView TryGetRecyclerView()
+				=> _rvRef.TryGetTarget(out var rv) ? rv : null;
+
+			public void OnGlobalLayout() => MarkAttachedItemViews();
+
+			public void MarkAttachedItemViews()
+			{
+				if (!_rvRef.TryGetTarget(out var rv) || rv == null)
+					return;
+
+				int count = rv.ChildCount;
+				for (int i = 0; i < count; i++)
+				{
+					var itemView = rv.GetChildAt(i);
+					if (itemView != null && itemView.ImportantForAccessibility != ImportantForAccessibility.No)
+						itemView.ImportantForAccessibility = ImportantForAccessibility.No;
+				}
+			}
 		}
 
 		protected virtual void SetViewPager2UserInputEnabled(bool value)
@@ -584,27 +554,6 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			{
 				base.OnPageSelected(position);
 				_shellSectionRenderer.OnPageSelected(position);
-			}
-		}
-
-		// Removes the pager's swipe/scroll accessibility actions (and collection info) so
-		// TalkBack doesn't announce a "swipe to next page" affordance when there's only a
-		// single tab and swiping has been disabled via SetViewPager2UserInputEnabled(false).
-		// This intentionally leaves the ViewPager2 container itself important for
-		// accessibility (the default) so its descendant content remains individually
-		// focusable instead of being merged into a single accessibility node.
-		class SingleTabViewPagerAccessibilityDelegate : AccessibilityDelegateCompat
-		{
-			public override void OnInitializeAccessibilityNodeInfo(AView host, AccessibilityNodeInfoCompat info)
-			{
-				base.OnInitializeAccessibilityNodeInfo(host, info);
-
-				if (info == null)
-					return;
-
-				info.RemoveAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ActionScrollForward);
-				info.RemoveAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ActionScrollBackward);
-				info.SetCollectionInfo(null);
 			}
 		}
 	}
