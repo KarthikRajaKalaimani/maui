@@ -705,6 +705,72 @@ namespace Microsoft.Maui.DeviceTests
 			return verticalOffset;
 		}
 
+		[Fact(DisplayName = "TalkBack Does Not Merge Multiple Labels Into a Single Accessibility Node (Shell)")]
+		public async Task AccessibilityFocusIsNotMergedAcrossLabelsInShellPage()
+		{
+			SetupBuilder();
+
+			var page1 = new ContentPage
+			{
+				Content = new VerticalStackLayout
+				{
+					new Label { Text = "Withdraw" },
+					new Label { Text = "Deposit" },
+					new Label { Text = "History" },
+					new Label { Text = "Transaction" },
+				}
+			};
+
+			var page2 = new ContentPage { Content = new Label { Text = "Second Tab" } };
+
+			var shell = await CreateShellAsync(shell =>
+			{
+				shell.Items.Add(new TabBar
+				{
+					Items =
+					{
+						new ShellContent { Route = "Item1", Content = page1 },
+						new ShellContent { Route = "Item2", Content = page2 },
+					}
+				});
+			});
+
+			await CreateHandlerAndAddToWindow<ShellHandler>(shell, async (handler) =>
+			{
+				await OnLoadedAsync(page1);
+				await OnFrameSetToNotEmpty(page1);
+
+				var pagerParent = (page1.Handler as IPlatformViewHandler)
+					.PlatformView.GetParentOfType<ViewPager2>();
+
+				Assert.NotNull(pagerParent);
+
+				// ViewPager2 (and its internal RecyclerView) must be excluded from the
+				// accessibility tree so TalkBack doesn't merge all of the Labels' text
+				// into a single accessibility-focus event on ViewPager2 itself.
+				// https://github.com/dotnet/maui/issues/36304
+				Assert.False(pagerParent.Focusable);
+				Assert.Equal(ImportantForAccessibility.No, pagerParent.ImportantForAccessibility);
+
+				var recyclerView = pagerParent.GetFirstChildOfType<RecyclerView>();
+				Assert.NotNull(recyclerView);
+				Assert.False(recyclerView.Focusable);
+
+				var itemView = recyclerView.GetChildAt(0) as ViewGroup;
+				Assert.NotNull(itemView);
+				Assert.Equal(ImportantForAccessibility.No, itemView.ImportantForAccessibility);
+
+				// Each individual Label must remain its own reachable accessibility node so
+				// TalkBack can focus (and announce) them one at a time instead of merging
+				// all of their text together.
+				var labels = itemView.GetChildrenOfType<MauiTextView>().ToList();
+				Assert.Equal(4, labels.Count);
+
+				foreach (var label in labels)
+					Assert.NotEqual(ImportantForAccessibility.No, label.ImportantForAccessibility);
+			});
+		}
+
 		ShellFlyoutRenderer GetDrawerLayout(ShellRenderer shellRenderer)
 		{
 			IShellContext shellContext = shellRenderer;
