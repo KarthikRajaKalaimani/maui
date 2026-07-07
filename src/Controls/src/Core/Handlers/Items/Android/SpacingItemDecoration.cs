@@ -15,6 +15,8 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 
 		ItemsLayoutOrientation _orientation;
 
+		bool _isGridItemsLayout;
+
 		public SpacingItemDecoration(Context context, IItemsLayout itemsLayout)
 		{
 			// The original "SpacingItemDecoration" applied spacing based on an item's current span index.
@@ -39,6 +41,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 					horizontalOffset = gridItemsLayout.HorizontalItemSpacing / 2.0;
 					verticalOffset = gridItemsLayout.VerticalItemSpacing / 2.0;
 					_orientation = gridItemsLayout.Orientation;
+					_isGridItemsLayout = true;
 					break;
 				case LinearItemsLayout listItemsLayout:
 					if (listItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal)
@@ -83,8 +86,9 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 
 			// Interior items only get half of the requested spacing on each side (the neighboring
 			// item contributes the other half), but the first/last row or column has no neighbor on
-			// the outer side. Double the offset there so the outer edge gets the same visual gap as
-			// the gaps between items, instead of collapsing to zero.
+			// the outer side. For GridItemsLayout, double the offset there so the outer edge gets the
+			// same visual gap as the gaps between items, instead of collapsing to zero. Linear layouts
+			// (single row/column lists) keep the original edge-trimming behavior.
 			int rowCol;
 			int lastRowCol;
 
@@ -104,19 +108,21 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 				lastRowCol = itemCount - 1;
 			}
 
+			var edgeOffset = _isGridItemsLayout ? 2 : 0;
+
 			if (_orientation == ItemsLayoutOrientation.Vertical)
 			{
 				if (rowCol == 0)
-					outRect.Top = VerticalOffset * 2;
+					outRect.Top = VerticalOffset * edgeOffset;
 				if (rowCol == lastRowCol)
-					outRect.Bottom = VerticalOffset * 2;
+					outRect.Bottom = VerticalOffset * edgeOffset;
 			}
 			else
 			{
 				if (rowCol == 0)
-					outRect.Left = HorizontalOffset * 2;
+					outRect.Left = HorizontalOffset * edgeOffset;
 				if (rowCol == lastRowCol)
-					outRect.Right = HorizontalOffset * 2;
+					outRect.Right = HorizontalOffset * edgeOffset;
 			}
 		}
 	}
