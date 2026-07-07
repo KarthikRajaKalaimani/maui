@@ -216,6 +216,14 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				_viewPager.Adapter = null;
 				adapter.Dispose();
 
+				// Explicitly detach the item-view accessibility attach listener so it doesn't
+				// retain a strong reference to this renderer past teardown.
+				if (_recyclerViewWithAttachListener != null && _itemViewAttachListener != null)
+					_recyclerViewWithAttachListener.RemoveOnChildAttachStateChangeListener(_itemViewAttachListener);
+
+				_recyclerViewWithAttachListener = null;
+				_itemViewAttachListener = null;
+
 				_tablayout.LayoutChange -= OnTabLayoutChange;
 				_toolbarAppearanceTracker.Dispose();
 				_tabLayoutAppearanceTracker.Dispose();
@@ -387,28 +395,31 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			}
 		}
 
-		// Marks every intermediate container ViewGroup between the RecyclerView item view and the
-		// actual leaf content (Labels, etc.) as ImportantForAccessibility.No. Even after excluding
-		// the item view itself from the accessibility tree, TalkBack can still merge descendant
-		// text into whichever ancestor ViewGroup (ShellPageContainer / ContentViewGroup /
+		// Marks intermediate "pass-through" container ViewGroups between the RecyclerView item view
+		// and the actual leaf/multi-child content (Labels, etc.) as ImportantForAccessibility.No. Even
+		// after excluding the item view itself from the accessibility tree, TalkBack can still merge
+		// descendant text into whichever ancestor ViewGroup (ShellPageContainer / ContentViewGroup /
 		// LayoutViewGroup) is the first one Android's default "Auto" resolution treats as
-		// accessibility-important. Excluding all of these pass-through containers (but not the
-		// leaf content views) lets TalkBack focus each leaf view (e.g. each Label) individually.
+		// accessibility-important. Excluding all of these pass-through containers (but not the actual
+		// content container or its leaf views) lets TalkBack focus each leaf view (e.g. each Label)
+		// individually.
 		static void MarkIntermediateContainersNotImportant(AView view)
 		{
 			if (view is ViewGroup group)
 			{
 				// Only recurse through single-child "pass-through" containers. A container with
 				// multiple children (e.g. a VerticalStackLayout hosting several Labels) is where
-				// the actual leaf content lives, so stop there and leave those children untouched.
+				// the actual content lives, so stop there WITHOUT touching its
+				// ImportantForAccessibility. That container may intentionally be an accessible node
+				// in its own right (e.g. it has SemanticProperties.Description/Hint set, which
+				// ViewHandler.Android.cs maps to ImportantForAccessibility.Yes); forcing it to "No"
+				// here would silently override that and break the developer's intended accessibility
+				// experience. Only single-child pass-through wrappers (which have no content of their
+				// own) are safe to exclude from the accessibility tree.
 				if (group.ChildCount == 1)
 				{
 					group.ImportantForAccessibility = ImportantForAccessibility.No;
 					MarkIntermediateContainersNotImportant(group.GetChildAt(0));
-				}
-				else
-				{
-					group.ImportantForAccessibility = ImportantForAccessibility.No;
 				}
 			}
 		}
