@@ -21,8 +21,9 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			// It did not apply any spacing to items currently at span index 0 which can create an issue for us with grid layouts.
 			// If one of those items at span index 0 were to move to another column, it would result in misaligned items.
 			// It's better to just apply equal spacing to all items so we can avoid that issue (even the ones at span index 0).
-			// The reason they didn't do this originally, I suspect, is that they didn't want spacing around the edge of the RecyclerView.
-			// That however can be corrected by adjusting the padding on the RecyclerView which we are now doing.
+			// Outer-edge items (first/last row or column) get double the offset in GetItemOffsets below, so the
+			// gap at the edges visually matches the gaps between items. This is handled entirely by the decoration;
+			// no RecyclerView padding is used (padding previously caused scroll/rendering issues, see #27093).
 
 			if (itemsLayout == null)
 			{
@@ -80,7 +81,10 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			outRect.Bottom = VerticalOffset;
 			outRect.Top = VerticalOffset;
 
-			// Remove spacing on the outer edges so spacing only appears between items.
+			// Interior items only get half of the requested spacing on each side (the neighboring
+			// item contributes the other half), but the first/last row or column has no neighbor on
+			// the outer side. Double the offset there so the outer edge gets the same visual gap as
+			// the gaps between items, instead of collapsing to zero.
 			int rowCol;
 			int lastRowCol;
 
@@ -103,16 +107,16 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			if (_orientation == ItemsLayoutOrientation.Vertical)
 			{
 				if (rowCol == 0)
-					outRect.Top = 0;
+					outRect.Top = VerticalOffset * 2;
 				if (rowCol == lastRowCol)
-					outRect.Bottom = 0;
+					outRect.Bottom = VerticalOffset * 2;
 			}
 			else
 			{
 				if (rowCol == 0)
-					outRect.Left = 0;
+					outRect.Left = HorizontalOffset * 2;
 				if (rowCol == lastRowCol)
-					outRect.Right = 0;
+					outRect.Right = HorizontalOffset * 2;
 			}
 		}
 	}

@@ -227,13 +227,17 @@ internal static class LayoutFactory2
 				section.ContentInsetsReference = UIContentInsetsReference.None;
 
 			if (scrollDirection == UICollectionViewScrollDirection.Vertical)
-			{
-				section.InterGroupSpacing = new NFloat(verticalItemSpacing);
-			}
-			else
-			{
-				section.InterGroupSpacing = new NFloat(horizontalItemSpacing);
-			}
+   			{
+       			section.InterGroupSpacing = new NFloat(verticalItemSpacing);
+       			if (verticalItemSpacing > 0)
+           			section.ContentInsets = new NSDirectionalEdgeInsets(halfVerticalSpacing, 0, halfVerticalSpacing, 0);
+   			}
+   			else
+   			{
+       			section.InterGroupSpacing = new NFloat(horizontalItemSpacing);
+       			if (horizontalItemSpacing > 0)
+           			section.ContentInsets = new NSDirectionalEdgeInsets(0, halfHorizontalSpacing, 0, halfHorizontalSpacing);
+   			}
 
 
 			section.BoundarySupplementaryItems = CreateSupplementaryItems(
