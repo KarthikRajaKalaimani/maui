@@ -9,7 +9,7 @@ public class Issue34257 : ContentPage
 	readonly GridItemsLayout _itemsLayoutVertical;
 	readonly Label _statusLabel;
 
-	readonly Label _statusLabelHorinzontal;
+	readonly Label _statusLabelHorizontal;
 
 	public Issue34257()
 	{
@@ -29,7 +29,7 @@ public class Issue34257 : ContentPage
 			AutomationId = "StatusLabelVertical",
 			Text = "Spacing=0,0"
 		};
-		_statusLabelHorinzontal = new Label
+		_statusLabelHorizontal = new Label
 		{
 			AutomationId = "StatusLabelHorizontal",
 			Text = "Spacing=0,0"
@@ -191,7 +191,7 @@ public class Issue34257 : ContentPage
 						}
 					},
 					_statusLabel,
-					_statusLabelHorinzontal,
+					_statusLabelHorizontal,
 					new Label { Text = "Vertical CollectionView" },
 					collectionViewV,
 					new Label { Text = "Horizontal CollectionView" },
@@ -205,7 +205,7 @@ public class Issue34257 : ContentPage
 	{
 		_itemsLayoutHorizontal.VerticalItemSpacing = 80;
 		_itemsLayoutHorizontal.HorizontalItemSpacing = 80;
-		_statusLabel.Text = "Spacing=80,80";
+		_statusLabelHorizontal.Text = "Spacing=80,80";
 	}
 
 	void OnApplyVerticalSpacingClicked(object sender, EventArgs e)
