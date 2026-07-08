@@ -15,30 +15,20 @@ public class Issue34257 : _IssuesUITest
 
 	[Test]
 	[Category(UITestCategories.CollectionView)]
-	public void UpdatingHorizontalSpacingShouldResizeBothColumns()
+	public void UpdateSpacingForHorizontalGridAndVerticalGrid()
 	{
-		var firstColumnBefore = App.WaitForElement("FirstColumnTopItem").GetRect();
+		var firstColumnBefore = App.WaitForElement("FirstColumnTopItemHorizontal").GetRect();
 		App.Tap("ApplyHorizontalSpacingButton");
-		App.WaitForElement("StatusLabel", "Spacing=0,80");
-		var firstColumnAfter = App.WaitForElement("FirstColumnTopItem").GetRect();
-		Assert.That(firstColumnBefore.X, Is.Not.EqualTo(firstColumnAfter.X), $"Expected the first column to move");
-	}
-
-	[Test]
-	[Category(UITestCategories.CollectionView)]
-	public void UpdatingVerticalSpacingShouldResizeBothRows()
-	{
-		var firstColumnTopBefore = App.WaitForElement("FirstColumnTopItem").GetRect();
-		var firstColumnBottomBefore = App.WaitForElement("FirstColumnBottomItem").GetRect();
-		var rowGapBefore = firstColumnBottomBefore.Y - (firstColumnTopBefore.Y + firstColumnTopBefore.Height);
-
+		App.WaitForElement("StatusLabelHorizontal", "Spacing=80,80");
+		var firstColumnAfter = App.WaitForElement("FirstColumnTopItemHorizontal").GetRect();
+		Assert.That(firstColumnBefore.X, Is.Not.EqualTo(firstColumnAfter.X), $"Expected the first column to move Horizontally");
+		Assert.That(firstColumnBefore.Y, Is.Not.EqualTo(firstColumnAfter.Y), $"Expected the first column to move Vertically");
+		var firstColumnBeforeVertical = App.WaitForElement("FirstColumnTopItemVertical").GetRect();
 		App.Tap("ApplyVerticalSpacingButton");
-		App.WaitForElement("StatusLabel", "Spacing=40,0");
+		App.WaitForElement("StatusLabelVertical", "Spacing=80,80");
+		var firstColumnAfterVertical = App.WaitForElement("FirstColumnTopItemVertical").GetRect();
+		Assert.That(firstColumnBeforeVertical.Y, Is.Not.EqualTo(firstColumnAfterVertical.Y), $"Expected the first column to move Vertically");
+		Assert.That(firstColumnBeforeVertical.X, Is.Not.EqualTo(firstColumnAfterVertical.X), $"Expected the first column to move Horizontally");
 
-		var firstColumnTopAfter = App.WaitForElement("FirstColumnTopItem").GetRect();
-		var firstColumnBottomAfter = App.WaitForElement("FirstColumnBottomItem").GetRect();
-		var rowGapAfter = firstColumnBottomAfter.Y - (firstColumnTopAfter.Y + firstColumnTopAfter.Height);
-
-		Assert.That(rowGapAfter, Is.GreaterThan(rowGapBefore), $"Expected the gap between rows to increase");
 	}
 }

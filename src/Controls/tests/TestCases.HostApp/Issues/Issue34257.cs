@@ -5,12 +5,20 @@ namespace Maui.Controls.Sample.Issues;
 [Issue(IssueTracker.Github, 34257, "CollectionView vertical grid item spacing updates all rows and columns", PlatformAffected.Android | PlatformAffected.iOS | PlatformAffected.macOS)]
 public class Issue34257 : ContentPage
 {
-	readonly GridItemsLayout _itemsLayout;
+	readonly GridItemsLayout _itemsLayoutHorizontal;
+	readonly GridItemsLayout _itemsLayoutVertical;
 	readonly Label _statusLabel;
+
+	readonly Label _statusLabelHorinzontal;
 
 	public Issue34257()
 	{
-		_itemsLayout = new GridItemsLayout(2, ItemsLayoutOrientation.Vertical)
+		_itemsLayoutHorizontal = new GridItemsLayout(2, ItemsLayoutOrientation.Horizontal)
+		{
+			HorizontalItemSpacing = 0,
+			VerticalItemSpacing = 0
+		};
+		_itemsLayoutVertical = new GridItemsLayout(2, ItemsLayoutOrientation.Vertical)
 		{
 			HorizontalItemSpacing = 0,
 			VerticalItemSpacing = 0
@@ -18,7 +26,12 @@ public class Issue34257 : ContentPage
 
 		_statusLabel = new Label
 		{
-			AutomationId = "StatusLabel",
+			AutomationId = "StatusLabelVertical",
+			Text = "Spacing=0,0"
+		};
+		_statusLabelHorinzontal = new Label
+		{
+			AutomationId = "StatusLabelHorizontal",
 			Text = "Spacing=0,0"
 		};
 
@@ -36,18 +49,76 @@ public class Issue34257 : ContentPage
 		};
 		applyVerticalSpacingButton.Clicked += OnApplyVerticalSpacingClicked;
 
-		var collectionView = new CollectionView
+		var collectionViewV = new CollectionView
 		{
-			AutomationId = "TestCollectionView",
-			HeightRequest = 260,
+			AutomationId = "TestCollectionViewVertical",
 			HorizontalOptions = LayoutOptions.Center,
-			ItemsLayout = _itemsLayout,
-			ItemsSource = CreateItems(),
-			ItemSizingStrategy = ItemSizingStrategy.MeasureAllItems,
-			SelectionMode = SelectionMode.None,
-			WidthRequest = 340
+			ItemsLayout = _itemsLayoutVertical,
+			ItemsSource = CreateItems()
 		};
-		collectionView.ItemTemplate = new DataTemplate(() =>
+		collectionViewV.ItemTemplate = new DataTemplate(() =>
+		{
+			var titleLabel = new Label
+			{
+				FontAttributes = FontAttributes.Bold,
+				LineBreakMode = LineBreakMode.TailTruncation
+			};
+			titleLabel.SetBinding(Label.TextProperty, nameof(SpacingIssueItem.Name));
+
+			var locationLabel = new Label
+			{
+				FontAttributes = FontAttributes.Italic,
+				LineBreakMode = LineBreakMode.TailTruncation,
+				VerticalOptions = LayoutOptions.End
+			};
+			locationLabel.SetBinding(Label.TextProperty, nameof(SpacingIssueItem.Location));
+
+			var textLayout = new Grid
+			{
+				RowDefinitions =
+				{
+					new RowDefinition { Height = GridLength.Auto },
+					new RowDefinition { Height = GridLength.Auto }
+				}
+			};
+			textLayout.Add(titleLabel);
+			textLayout.Add(locationLabel, 0, 1);
+
+			var root = new Grid
+			{
+				ColumnDefinitions =
+				{
+					new ColumnDefinition { Width = 70 },
+					new ColumnDefinition { Width = GridLength.Star }
+				},
+				Padding = 10
+			};
+			root.SetBinding(AutomationIdProperty, nameof(SpacingIssueItem.AutomationId));
+			root.SetBinding(BackgroundColorProperty, nameof(SpacingIssueItem.BackgroundColor));
+
+			var imagePlaceholder = new Border
+			{
+				Background = Colors.DarkSlateBlue,
+				HeightRequest = 60,
+				StrokeThickness = 0,
+				VerticalOptions = LayoutOptions.Center,
+				WidthRequest = 60
+			};
+
+			root.Add(imagePlaceholder);
+			root.Add(textLayout, 1, 0);
+
+			return root;
+		});
+
+		var horizontalCollectionView = new CollectionView
+		{
+			AutomationId = "TestCollectionViewHorizontal",
+			HorizontalOptions = LayoutOptions.Center,
+			ItemsLayout = _itemsLayoutHorizontal,
+			ItemsSource = CreateItemsForHorizontal()
+		};
+		horizontalCollectionView.ItemTemplate = new DataTemplate(() =>
 		{
 			var titleLabel = new Label
 			{
@@ -110,8 +181,6 @@ public class Issue34257 : ContentPage
 				Spacing = 12,
 				Children =
 				{
-					new Label { Text = "Issue 34257 reproduces a spacing update bug in a two-column vertical CollectionView grid." },
-					new Label { Text = "Apply horizontal or vertical spacing and verify both columns and rows resize consistently." },
 					new HorizontalStackLayout
 					{
 						Spacing = 12,
@@ -122,7 +191,11 @@ public class Issue34257 : ContentPage
 						}
 					},
 					_statusLabel,
-					collectionView
+					_statusLabelHorinzontal,
+					new Label { Text = "Vertical CollectionView" },
+					collectionViewV,
+					new Label { Text = "Horizontal CollectionView" },
+					horizontalCollectionView
 				}
 			}
 		};
@@ -130,26 +203,37 @@ public class Issue34257 : ContentPage
 
 	void OnApplyHorizontalSpacingClicked(object sender, EventArgs e)
 	{
-		_itemsLayout.VerticalItemSpacing = 0;
-		_itemsLayout.HorizontalItemSpacing = 80;
-		_statusLabel.Text = "Spacing=0,80";
+		_itemsLayoutHorizontal.VerticalItemSpacing = 80;
+		_itemsLayoutHorizontal.HorizontalItemSpacing = 80;
+		_statusLabel.Text = "Spacing=80,80";
 	}
 
 	void OnApplyVerticalSpacingClicked(object sender, EventArgs e)
 	{
-		_itemsLayout.VerticalItemSpacing = 40;
-		_itemsLayout.HorizontalItemSpacing = 0;
-		_statusLabel.Text = "Spacing=40,0";
+         _itemsLayoutVertical.VerticalItemSpacing = 80;
+		_itemsLayoutVertical.HorizontalItemSpacing = 80;
+		_statusLabel.Text = "Spacing=80,80";
 	}
 
 	static ObservableCollection<SpacingIssueItem> CreateItems()
 	{
 		return
 		[
-			new SpacingIssueItem("FirstColumnTopItem", "Capuchin", "Central America", Colors.LightSkyBlue),
-			new SpacingIssueItem("SecondColumnTopItem", "Spider", "South America", Colors.LightSalmon),
-			new SpacingIssueItem("FirstColumnBottomItem", "Howler", "South America", Colors.PaleGreen),
-			new SpacingIssueItem("SecondColumnBottomItem", "Baboon", "Africa", Colors.Khaki)
+			new SpacingIssueItem("FirstColumnTopItemVertical", "Capuchin", "Central America", Colors.LightSkyBlue),
+			new SpacingIssueItem("SecondColumnTopItemVertical", "Spider", "South America", Colors.LightSalmon),
+			new SpacingIssueItem("FirstColumnBottomItemVertical", "Howler", "South America", Colors.PaleGreen),
+			new SpacingIssueItem("SecondColumnBottomItemVertical", "Baboon", "Africa", Colors.Khaki)
+		];
+	}
+
+	static ObservableCollection<SpacingIssueItem> CreateItemsForHorizontal()
+	{
+		return
+		[
+			new SpacingIssueItem("FirstColumnTopItemHorizontal", "Capuchin", "Central America", Colors.LightSkyBlue),
+			new SpacingIssueItem("SecondColumnTopItemHorizontal", "Spider", "South America", Colors.LightSalmon),
+			new SpacingIssueItem("FirstColumnBottomItemHorizontal", "Howler", "South America", Colors.PaleGreen),
+			new SpacingIssueItem("SecondColumnBottomItemHorizontal", "Baboon", "Africa", Colors.Khaki)
 		];
 	}
 
