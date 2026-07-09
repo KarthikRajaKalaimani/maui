@@ -120,9 +120,15 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			else
 			{
 				if (rowCol == 0)
+				{
 					outRect.Left = HorizontalOffset * edgeOffset;
+					outRect.Top = HorizontalOffset * edgeOffset;
+				}
 				if (rowCol == lastRowCol)
+				{
 					outRect.Right = HorizontalOffset * edgeOffset;
+					outRect.Bottom = HorizontalOffset * edgeOffset;
+				}
 			}
 		}
 	}

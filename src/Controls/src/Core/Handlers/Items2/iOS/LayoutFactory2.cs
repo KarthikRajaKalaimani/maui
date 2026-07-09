@@ -230,13 +230,13 @@ internal static class LayoutFactory2
    			{
        			section.InterGroupSpacing = new NFloat(verticalItemSpacing);
        			if (verticalItemSpacing > 0)
-           			section.ContentInsets = new NSDirectionalEdgeInsets(halfVerticalSpacing, 0, halfVerticalSpacing, 0);
+           			section.ContentInsets = new NSDirectionalEdgeInsets(new nfloat(verticalItemSpacing), 0, new nfloat(verticalItemSpacing), 0);
    			}
    			else
    			{
        			section.InterGroupSpacing = new NFloat(horizontalItemSpacing);
        			if (horizontalItemSpacing > 0)
-           			section.ContentInsets = new NSDirectionalEdgeInsets(0, halfHorizontalSpacing, 0, halfHorizontalSpacing);
+           			section.ContentInsets = new NSDirectionalEdgeInsets(halfHorizontalSpacing, new nfloat(horizontalItemSpacing), halfHorizontalSpacing, new nfloat(horizontalItemSpacing));
    			}
 
 
