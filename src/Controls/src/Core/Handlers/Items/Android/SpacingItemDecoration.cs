@@ -91,15 +91,19 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			// (single row/column lists) keep the original edge-trimming behavior.
 			int rowCol;
 			int lastRowCol;
+			int spanIndex = 0;
+			int spanCount = 1;
 
 			if (parent.GetLayoutManager() is GridLayoutManager gridLayoutManager)
 			{
 				// Use SpanSizeLookup instead of position/spanCount so full-span items
 				// (group headers, footers, etc.) are accounted for when determining rows.
 				var spanSizeLookup = gridLayoutManager.GetSpanSizeLookup();
-				int spanCount = gridLayoutManager.SpanCount;
+				spanCount = gridLayoutManager.SpanCount;
 				rowCol = spanSizeLookup.GetSpanGroupIndex(position, spanCount);
 				lastRowCol = spanSizeLookup.GetSpanGroupIndex(itemCount - 1, spanCount);
+				// spanIndex is the row position within each column (0 = first row, spanCount-1 = last row).
+				spanIndex = spanSizeLookup.GetSpanIndex(position, spanCount);
 			}
 			else
 			{
@@ -119,16 +123,17 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			}
 			else
 			{
+				// Scroll-axis (left/right): only first/last column group.
 				if (rowCol == 0)
-				{
 					outRect.Left = HorizontalOffset * edgeOffset;
-					outRect.Top = HorizontalOffset * edgeOffset;
-				}
 				if (rowCol == lastRowCol)
-				{
 					outRect.Right = HorizontalOffset * edgeOffset;
-					outRect.Bottom = HorizontalOffset * edgeOffset;
-				}
+
+				// Cross-axis (top/bottom): every item in the first/last row across all columns.
+				if (spanIndex == 0)
+					outRect.Top = VerticalOffset * edgeOffset;
+				if (spanIndex == spanCount - 1)
+					outRect.Bottom = VerticalOffset * edgeOffset;
 			}
 		}
 	}
