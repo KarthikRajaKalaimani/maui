@@ -24,22 +24,42 @@ namespace Microsoft.Maui.Controls
 			return null;
 		}
 
-		bool FeatureEnabled
-		{
-			get
-			{
-				// Walk the live tree first. If FocusedView has been detached from the
-				// logical tree its Parent chain returns null, so fall back to the page
-				// that was cached when the view became focused. This preserves the
-				// original behavior where the feature remains enabled until the view
-				// explicitly loses focus.
-				var page = GetEnclosingPage(FocusedView) ?? FocusedEnclosingPage;
-				return page is not null && page.HideSoftInputOnTapped && page.HasNavigatedTo;
-			}
-		}
+		bool FeatureEnabled => ResolveFocusedPage() is ContentPage page && page.HideSoftInputOnTapped && page.HasNavigatedTo;
 
 		ContentPage? FocusedEnclosingPage =>
 			_focusedViewEnclosingPage?.TryGetTarget(out var p) == true ? p : null;
+
+		// Resolves the page that should currently gate the tap watcher for the
+		// focused view.
+		ContentPage? ResolveFocusedPage()
+		{
+			var focusedView = FocusedView;
+
+			// Walk the live tree first.
+			if (GetEnclosingPage(focusedView) is ContentPage page)
+				return page;
+
+			// FocusedView's logical Parent chain no longer resolves to a page. This can
+			// happen transiently during navigation (the view is detached before its
+			// LostFocus/NavigatedFrom fires) or permanently when the enclosing page was
+			// removed from the visual tree without ever raising those events (e.g. the
+			// top-level Window.Page/Application.MainPage was replaced directly). Only
+			// trust the page cached when focus was set while the view is still attached
+			// to a live platform Window; once the view has no Window at all, treat it as
+			// gone and stop tracking it so the feature doesn't stay enabled indefinitely
+			// for a page that's no longer part of the visual tree.
+			if (focusedView is VisualElement { Window: not null })
+				return FocusedEnclosingPage;
+
+			if (_focusedView is not null || _focusedViewEnclosingPage is not null)
+			{
+				_focusedView = null;
+				_focusedViewEnclosingPage = null;
+				DisconnectFromPlatform();
+			}
+
+			return null;
+		}
 
 		internal void UpdatePage(ContentPage page)
 		{

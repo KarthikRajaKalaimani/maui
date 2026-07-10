@@ -43,8 +43,9 @@ public class Issue35890 : _IssuesUITest
 	{
 		// Step 1: Log in from the LoginPage (HideSoftInputOnTapped = True), unless a previous
 		// test in this fixture has already done so.
-		// This triggers NavigatedTo on the LoginPage, which registers it in
-		// HideSoftInputOnTappedChangedManager._contentPages.
+		// This triggers NavigatedTo on the LoginPage, and the focused Entry on the
+		// LoginPage is tracked by HideSoftInputOnTappedChangedManager (_focusedView /
+		// _focusedViewEnclosingPage).
 		// The login action hides the ShellContent (IsVisible=false) and navigates
 		// via absolute GoToAsync — which does NOT fire NavigatedFrom on the LoginPage.
 		// Step 2: Verify we are on the HomePage (HideSoftInputOnTapped = False).
@@ -67,7 +68,7 @@ public class Issue35890 : _IssuesUITest
 		// On a page with HideSoftInputOnTapped=False the keyboard must NOT be dismissed.
 		Assert.That(App.IsKeyboardShown(), Is.True,
 			"Keyboard should remain visible when HideSoftInputOnTapped=False is set on the current page. " +
-			"The stale LoginPage registration in HideSoftInputOnTappedChangedManager must have been cleaned up.");
+			"The stale LoginPage tracking in HideSoftInputOnTappedChangedManager must have been cleaned up.");
 
 		// Step 6: Verify the button tap actually executed (not swallowed by keyboard dismissal).
 		Assert.That(App.FindElement("ResultLabel").GetText(), Is.EqualTo("Button Tapped"),
