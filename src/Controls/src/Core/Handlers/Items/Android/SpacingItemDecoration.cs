@@ -93,7 +93,6 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			int lastRowCol;
 			int spanIndex = 0;
 			int spanCount = 1;
-			int spanSize = 1;
 
 			if (parent.GetLayoutManager() is GridLayoutManager gridLayoutManager)
 			{
@@ -103,8 +102,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 				spanCount = gridLayoutManager.SpanCount;
 				rowCol = spanSizeLookup.GetSpanGroupIndex(position, spanCount);
 				lastRowCol = spanSizeLookup.GetSpanGroupIndex(itemCount - 1, spanCount);
-				spanSize = spanSizeLookup.GetSpanSize(position);
-				// spanIndex is the cross-axis position within the current span group.
+				// spanIndex is the row position within each column (0 = first row, spanCount-1 = last row).
 				spanIndex = spanSizeLookup.GetSpanIndex(position, spanCount);
 			}
 			else
@@ -118,11 +116,6 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 
 			if (_orientation == ItemsLayoutOrientation.Vertical)
 			{
-				if (spanIndex == 0)
-					outRect.Left = HorizontalOffset * edgeOffset;
-				if (spanIndex + spanSize == spanCount)
-					outRect.Right = HorizontalOffset * edgeOffset;
-
 				if (rowCol == 0)
 					outRect.Top = VerticalOffset * edgeOffset;
 				if (rowCol == lastRowCol)
@@ -139,7 +132,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 				// Cross-axis (top/bottom): every item in the first/last row across all columns.
 				if (spanIndex == 0)
 					outRect.Top = VerticalOffset * edgeOffset;
-				if (spanIndex + spanSize == spanCount)
+				if (spanIndex == spanCount - 1)
 					outRect.Bottom = VerticalOffset * edgeOffset;
 			}
 		}
