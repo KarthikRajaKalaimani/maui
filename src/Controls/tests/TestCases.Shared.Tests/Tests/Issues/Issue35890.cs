@@ -32,6 +32,17 @@ public class Issue35890 : _IssuesUITest
 			// Not on the HomePage yet - fall through and log in.
 		}
 
+		// Focus UsernameEntry before logging in. This is essential to the regression:
+		// it causes HideSoftInputOnTappedChangedManager to cache the LoginPage as the
+		// focused view's enclosing page (_focusedViewEnclosingPage). Since the ensuing
+		// navigation hides the ShellContent without ever firing NavigatedFrom/LostFocus,
+		// that cached LoginPage reference is exactly what must be discarded once the
+		// Entry is detached - without a focused Entry, the fix's cache-fallback path
+		// would never be exercised by this test.
+		App.WaitForElement("UsernameEntry");
+		App.Tap("UsernameEntry");
+		Assert.That(App.IsKeyboardShown(), Is.True, "Keyboard should be visible after tapping the Entry on the LoginPage.");
+
 		App.WaitForElement("LoginButton");
 		App.Tap("LoginButton");
 		App.WaitForElement("HomePageLabel");
@@ -41,17 +52,20 @@ public class Issue35890 : _IssuesUITest
 	[Category(UITestCategories.SoftInput)]
 	public void HideSoftInputOnTappedDoesNotPersistAfterShellContentHiddenWithoutNavigatedFrom()
 	{
-		// Step 1: Log in from the LoginPage (HideSoftInputOnTapped = True), unless a previous
-		// test in this fixture has already done so.
-		// This triggers NavigatedTo on the LoginPage, and the focused Entry on the
-		// LoginPage is tracked by HideSoftInputOnTappedChangedManager (_focusedView /
-		// _focusedViewEnclosingPage).
-		// The login action hides the ShellContent (IsVisible=false) and navigates
-		// via absolute GoToAsync — which does NOT fire NavigatedFrom on the LoginPage.
+		// Step 1: Focus the Entry on the LoginPage, then log in (HideSoftInputOnTapped = True),
+		// unless a previous test in this fixture has already done so.
+		// Focusing UsernameEntry causes HideSoftInputOnTappedChangedManager to cache the
+		// LoginPage as the focused view's enclosing page. This triggers NavigatedTo on the
+		// LoginPage, then hides the ShellContent (IsVisible=false) and navigates via absolute
+		// GoToAsync - which does NOT fire NavigatedFrom/LostFocus on the LoginPage, so the
+		// cached LoginPage reference is never explicitly cleared through those events.
 		// Step 2: Verify we are on the HomePage (HideSoftInputOnTapped = False).
 		EnsureOnHomePage();
 
-		// Step 3: Tap the Entry on the HomePage to show the keyboard.
+		// Step 3: Tap the Entry on the HomePage to show the keyboard. This is the very first
+		// tap after arriving on the HomePage, immediately exercising whether the stale
+		// LoginPage cache (populated in Step 1) has been discarded now that the previously
+		// focused Entry is detached from the live tree.
 		App.WaitForElement("HomeEntry");
 		App.Tap("HomeEntry");
 		Assert.That(App.IsKeyboardShown(), Is.True, "Keyboard should be visible after tapping the Entry on the HomePage.");

@@ -3,6 +3,7 @@
 // Ideally users would use behavior that's more accessible forward and consistent with platform expectations.
 #if ANDROID || IOS
 using System;
+using Microsoft.Maui.Controls.Platform;
 
 namespace Microsoft.Maui.Controls
 {
@@ -24,6 +25,24 @@ namespace Microsoft.Maui.Controls
 			return null;
 		}
 
+		// A page can remain a valid logical descendant of its Window (and thus keep a
+		// non-null Window/Parent chain) long after it has stopped being the page the
+		// user is actually looking at - Shell, NavigationPage and FlyoutPage all retain
+		// their inactive pages instead of tearing them down. Relying on Parent/Window
+		// alone would let a stale cached page keep gating the tap watcher indefinitely
+		// (e.g. Shell.GoToAsync switching ShellItem/ShellContent without ever firing
+		// NavigatedFrom on the outgoing page - see Issue35890). So we additionally
+		// require that the page is still the one actually being presented, by drilling
+		// down from the page's Window through any Shell/NavigationPage/FlyoutPage
+		// containers via GetCurrentPage().
+		static bool IsCurrentlyDisplayedPage(ContentPage page)
+		{
+			if (page.Window?.Page is not Page rootPage)
+				return false;
+
+			return ReferenceEquals(rootPage.GetCurrentPage(), page);
+		}
+
 		bool FeatureEnabled => ResolveFocusedPage() is ContentPage page && page.HideSoftInputOnTapped && page.HasNavigatedTo;
 
 		ContentPage? FocusedEnclosingPage =>
@@ -35,9 +54,10 @@ namespace Microsoft.Maui.Controls
 		{
 			var focusedView = FocusedView;
 
-			// Walk the live tree first.
-			if (GetEnclosingPage(focusedView) is ContentPage page)
-				return page;
+			// Walk the live tree first. Even if this resolves a page, it might no
+			// longer be the currently displayed one (see IsCurrentlyDisplayedPage).
+			if (GetEnclosingPage(focusedView) is ContentPage livePage)
+				return IsCurrentlyDisplayedPage(livePage) ? livePage : null;
 
 			// FocusedView's logical Parent chain no longer resolves to a page. This can
 			// happen transiently during navigation (the view is detached before its
@@ -45,11 +65,12 @@ namespace Microsoft.Maui.Controls
 			// removed from the visual tree without ever raising those events (e.g. the
 			// top-level Window.Page/Application.MainPage was replaced directly). Only
 			// trust the page cached when focus was set while the view is still attached
-			// to a live platform Window; once the view has no Window at all, treat it as
-			// gone and stop tracking it so the feature doesn't stay enabled indefinitely
-			// for a page that's no longer part of the visual tree.
-			if (focusedView is VisualElement { Window: not null })
-				return FocusedEnclosingPage;
+			// to a live platform Window, and only if that cached page is still the one
+			// currently displayed - otherwise treat it as gone and stop tracking it so
+			// the feature doesn't stay enabled indefinitely for a page that's no longer
+			// the one the user is interacting with.
+			if (focusedView is VisualElement { Window: not null } && FocusedEnclosingPage is ContentPage cachedPage)
+				return IsCurrentlyDisplayedPage(cachedPage) ? cachedPage : null;
 
 			if (_focusedView is not null || _focusedViewEnclosingPage is not null)
 			{
