@@ -539,7 +539,7 @@ namespace Microsoft.Maui.Controls.Build.Tasks
 			// (e.g. a custom base page/view) commonly declares the bound property, so failing to find
 			// the property on the literal AncestorType is not necessarily a real binding error.
 			bool tSourceRefIsAncestorTypeInferred = false;
-			if (HasRelativeOrReferenceSource(node) && !xDataTypeIsOnBindingNode)
+			if (HasRelativeOrReferenceSource(node) && xDataTypeIsInOuterScope)
 			{
 				if (!TryGetRelativeSourceAncestorTypeReference(node, context, module, out tSourceRef))
 				{
