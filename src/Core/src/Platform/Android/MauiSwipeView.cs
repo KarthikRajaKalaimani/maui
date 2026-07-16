@@ -1012,14 +1012,9 @@ namespace Microsoft.Maui.Platform
 			if (_swipeDirection == null)
 				return;
 
-			float triggerThreshold;
+			var swipeThresholdPercent = OpenSwipeThresholdPercentage * GetSwipeOpenDistance();
 
-			if (Element != null && Element.Threshold > 0)
-				triggerThreshold = Math.Min((float)Element.Threshold, GetSwipeOpenDistance());
-			else
-				triggerThreshold = OpenSwipeThresholdPercentage * GetSwipeOpenDistance();
-
-			if (Math.Abs(_swipeOffset) >= triggerThreshold)
+			if (Math.Abs(_swipeOffset) >= swipeThresholdPercent)
 			{
 				var swipeItems = GetSwipeItemsByDirection();
 
@@ -1426,11 +1421,9 @@ namespace Microsoft.Maui.Platform
 
 			bool isOpen = false;
 
-			float triggerThreshold = (Element != null && Element.Threshold > 0)
-				? Math.Min((float)Element.Threshold, GetSwipeOpenDistance())
-				: OpenSwipeThresholdPercentage * GetSwipeOpenDistance();
+			var swipeThresholdPercent = OpenSwipeThresholdPercentage * GetSwipeOpenDistance();
 
-			if (Math.Abs(_swipeOffset) >= triggerThreshold)
+			if (Math.Abs(_swipeOffset) >= swipeThresholdPercent)
 				isOpen = true;
 
 			Element?.SwipeEnded(new SwipeViewSwipeEnded(_swipeDirection.Value, isOpen));
