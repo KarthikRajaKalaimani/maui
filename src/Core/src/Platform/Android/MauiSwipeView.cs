@@ -1013,7 +1013,7 @@ namespace Microsoft.Maui.Platform
 				return;
 
 			float triggerThreshold;
-			
+
 			if (Element != null && Element.Threshold > 0)
 				triggerThreshold = Math.Min((float)Element.Threshold, GetSwipeOpenDistance());
 			else
