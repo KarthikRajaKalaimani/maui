@@ -22,10 +22,10 @@ public class Issue7580 : _IssuesUITest
 		var initialCount = App.FindElement("InvokeCountLabel").GetText();
 		Assert.That(initialCount, Is.EqualTo("InvokeCount: 0"));
 
-		var rect = App.WaitForElement("SwipeTarget").GetRect();
-		var centerY = rect.Y + rect.Height / 2;
-		var startX = rect.X + 20;
-		var endX = startX + 600;
+		var contentRect = App.WaitForElement("SwipeContent").GetRect();
+		var centerY = contentRect.Y + contentRect.Height / 2;
+		var startX = contentRect.X + 5;
+		var endX = contentRect.X + contentRect.Width - 5;
 
 		App.DragCoordinates(startX, centerY, endX, centerY);
 
