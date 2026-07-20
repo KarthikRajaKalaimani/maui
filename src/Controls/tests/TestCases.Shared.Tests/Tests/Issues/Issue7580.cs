@@ -22,14 +22,14 @@ public class Issue7580 : _IssuesUITest
 		var initialCount = App.FindElement("InvokeCountLabel").GetText();
 		Assert.That(initialCount, Is.EqualTo("InvokeCount: 0"));
 
-#if MACCATALYST
+#if MACCATALYST || WINDOWS
 		var contentRect = App.WaitForElement("SwipeTarget").GetRect();
 #else
 		var contentRect = App.WaitForElement("SwipeContent").GetRect();
 #endif
 		var centerY = contentRect.Y + contentRect.Height / 2;
-		var startX = contentRect.X + 5;
-#if MACCATALYST
+		var startX = contentRect.X + 20;
+#if MACCATALYST || WINDOWS
 		var endX = contentRect.X + 600;
 #else
 		var endX = contentRect.X + contentRect.Width - 5;
