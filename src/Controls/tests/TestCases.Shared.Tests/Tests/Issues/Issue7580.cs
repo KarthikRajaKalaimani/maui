@@ -22,18 +22,11 @@ public class Issue7580 : _IssuesUITest
 		var initialCount = App.FindElement("InvokeCountLabel").GetText();
 		Assert.That(initialCount, Is.EqualTo("InvokeCount: 0"));
 
-#if MACCATALYST || WINDOWS
-		var contentRect = App.WaitForElement("SwipeTarget").GetRect();
-#else
 		var contentRect = App.WaitForElement("SwipeContent").GetRect();
-#endif
 		var centerY = contentRect.Y + contentRect.Height / 2;
-		var startX = contentRect.X + 20;
-#if MACCATALYST || WINDOWS
-		var endX = contentRect.X + 600;
-#else
+		// Here contentRect.X is negative value on mac, so we need to make sure we don't start dragging from a negative X coordinate
+		var startX = Math.Max(contentRect.X + 20, 0);
 		var endX = contentRect.X + contentRect.Width - 5;
-#endif
 
 		App.DragCoordinates(startX, centerY, endX, centerY);
 
