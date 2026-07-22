@@ -35,20 +35,20 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			switch (itemsLayout)
 			{
 				case GridItemsLayout gridItemsLayout:
-					horizontalOffset = gridItemsLayout.HorizontalItemSpacing / 2.0;
-					verticalOffset = gridItemsLayout.VerticalItemSpacing / 2.0;
+					horizontalOffset = gridItemsLayout.HorizontalItemSpacing;
+					verticalOffset = gridItemsLayout.VerticalItemSpacing;
 					_orientation = gridItemsLayout.Orientation;
 					break;
 				case LinearItemsLayout listItemsLayout:
 					if (listItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal)
 					{
-						horizontalOffset = listItemsLayout.ItemSpacing / 2.0;
+						horizontalOffset = listItemsLayout.ItemSpacing;
 						verticalOffset = 0;
 					}
 					else
 					{
 						horizontalOffset = 0;
-						verticalOffset = listItemsLayout.ItemSpacing / 2.0;
+						verticalOffset = listItemsLayout.ItemSpacing;
 					}
 					_orientation = listItemsLayout.Orientation;
 					break;
@@ -75,44 +75,64 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			if (itemCount <= 0)
 				return;
 
-			outRect.Left = HorizontalOffset;
-			outRect.Right = HorizontalOffset;
-			outRect.Bottom = VerticalOffset;
-			outRect.Top = VerticalOffset;
-
-			// Remove spacing on the outer edges so spacing only appears between items.
+			// Apply spacing only between items, not on the outer edges.
 			int rowCol;
 			int lastRowCol;
 
 			if (parent.GetLayoutManager() is GridLayoutManager gridLayoutManager)
 			{
+				var layoutParams = view.LayoutParameters as GridLayoutManager.LayoutParams;
+				if (layoutParams == null)
+					return;
+
 				// Use SpanSizeLookup instead of position/spanCount so full-span items
 				// (group headers, footers, etc.) are accounted for when determining rows.
 				var spanSizeLookup = gridLayoutManager.GetSpanSizeLookup();
 				int spanCount = gridLayoutManager.SpanCount;
 				rowCol = spanSizeLookup.GetSpanGroupIndex(position, spanCount);
 				lastRowCol = spanSizeLookup.GetSpanGroupIndex(itemCount - 1, spanCount);
+
+				bool isLastCrossAxisItem = layoutParams.SpanIndex + layoutParams.SpanSize >= spanCount;
+
+				if (_orientation == ItemsLayoutOrientation.Vertical)
+				{
+					outRect.Left = 0;
+					outRect.Top = 0;
+					outRect.Right = isLastCrossAxisItem ? 0 : HorizontalOffset;
+					outRect.Bottom = rowCol == lastRowCol ? 0 : VerticalOffset;
+				}
+				else
+				{
+					bool isFirstCrossAxisItem = layoutParams.SpanIndex == 0;
+
+					outRect.Left = 0;
+					outRect.Top = isFirstCrossAxisItem ? 0 : VerticalOffset;
+					outRect.Right = rowCol == lastRowCol ? 0 : HorizontalOffset;
+					outRect.Bottom = 0;
+				}
+
+				return;
 			}
 			else
 			{
 				// Linear layout: each item occupies exactly one row/column.
 				rowCol = position;
 				lastRowCol = itemCount - 1;
-			}
 
-			if (_orientation == ItemsLayoutOrientation.Vertical)
-			{
-				if (rowCol == 0)
-					outRect.Top = 0;
-				if (rowCol == lastRowCol)
-					outRect.Bottom = 0;
-			}
-			else
-			{
-				if (rowCol == 0)
+				if (_orientation == ItemsLayoutOrientation.Vertical)
+				{
 					outRect.Left = 0;
-				if (rowCol == lastRowCol)
+					outRect.Top = 0;
 					outRect.Right = 0;
+					outRect.Bottom = rowCol == lastRowCol ? 0 : VerticalOffset;
+				}
+				else
+				{
+					outRect.Left = 0;
+					outRect.Top = 0;
+					outRect.Right = rowCol == lastRowCol ? 0 : HorizontalOffset;
+					outRect.Bottom = 0;
+				}
 			}
 		}
 	}
