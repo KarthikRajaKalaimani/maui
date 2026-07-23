@@ -4,6 +4,7 @@ using Android.Content;
 using AndroidX.RecyclerView.Widget;
 using ARect = Android.Graphics.Rect;
 using AView = Android.Views.View;
+using ALayoutDirection = Android.Views.LayoutDirection;
 
 namespace Microsoft.Maui.Controls.Handlers.Items
 {
@@ -75,6 +76,12 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			if (itemCount <= 0)
 				return;
 
+			// In RTL layouts, AndroidX's layout managers keep items in logical/adapter order but flip their
+			// physical on-screen position (e.g. span index 0 renders on the right, not the left). Horizontal
+			// spacing must therefore be assigned to the opposite physical side so it still lands between
+			// neighboring items instead of bleeding onto the new outer edge.
+			bool isRtl = parent.LayoutDirection == ALayoutDirection.Rtl;
+
 			// Apply spacing only between items, not on the outer edges.
 			int rowCol;
 			int lastRowCol;
@@ -96,19 +103,17 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 
 				if (_orientation == ItemsLayoutOrientation.Vertical)
 				{
-					outRect.Left = 0;
 					outRect.Top = 0;
-					outRect.Right = isLastCrossAxisItem ? 0 : HorizontalOffset;
 					outRect.Bottom = rowCol == lastRowCol ? 0 : VerticalOffset;
+					SetHorizontalOffset(outRect, isLastCrossAxisItem ? 0 : HorizontalOffset, isRtl);
 				}
 				else
 				{
 					bool isFirstCrossAxisItem = layoutParams.SpanIndex == 0;
 
-					outRect.Left = 0;
 					outRect.Top = isFirstCrossAxisItem ? 0 : VerticalOffset;
-					outRect.Right = rowCol == lastRowCol ? 0 : HorizontalOffset;
 					outRect.Bottom = 0;
+					SetHorizontalOffset(outRect, rowCol == lastRowCol ? 0 : HorizontalOffset, isRtl);
 				}
 
 				return;
@@ -128,11 +133,27 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 				}
 				else
 				{
-					outRect.Left = 0;
 					outRect.Top = 0;
-					outRect.Right = rowCol == lastRowCol ? 0 : HorizontalOffset;
 					outRect.Bottom = 0;
+					SetHorizontalOffset(outRect, rowCol == lastRowCol ? 0 : HorizontalOffset, isRtl);
 				}
+			}
+		}
+
+		// Assigns a horizontal spacing value to the physical side that faces the next item in adapter
+		// order. In LTR that's the item's right edge; in RTL, layout managers place the next item to the
+		// left instead, so the spacing has to move to the left edge to stay between items.
+		static void SetHorizontalOffset(ARect outRect, int offset, bool isRtl)
+		{
+			if (isRtl)
+			{
+				outRect.Left = offset;
+				outRect.Right = 0;
+			}
+			else
+			{
+				outRect.Left = 0;
+				outRect.Right = offset;
 			}
 		}
 	}

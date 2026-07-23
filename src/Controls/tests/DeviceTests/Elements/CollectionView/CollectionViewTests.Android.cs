@@ -11,8 +11,10 @@ using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;
 using Xunit;
+using static Microsoft.Maui.DeviceTests.AssertHelpers;
 using AInsets = AndroidX.Core.Graphics.Insets;
 using AView = Android.Views.View;
+using ALayoutDirection = Android.Views.LayoutDirection;
 
 namespace Microsoft.Maui.DeviceTests
 {
@@ -467,6 +469,173 @@ namespace Microsoft.Maui.DeviceTests
 
 				ViewCompat.DispatchApplyWindowInsets(itemPlatformView, insets);
 				Assert.Equal(1, itemPlatformView.PaddingLeft);
+			});
+		}
+
+		[Fact(DisplayName = "Grid CollectionView spacing applies only between items, not on outer edges (vertical)")]
+		public async Task GridItemsLayoutSpacingAppliesOnlyBetweenItemsVertical()
+		{
+			SetupBuilder();
+
+			const double itemSize = 50;
+			const double spacing = 20;
+			const int span = 2;
+
+			var itemLayouts = new List<Grid>();
+
+			var collectionView = new CollectionView
+			{
+				ItemsLayout = new GridItemsLayout(span, ItemsLayoutOrientation.Vertical)
+				{
+					HorizontalItemSpacing = spacing,
+					VerticalItemSpacing = spacing
+				},
+				ItemTemplate = new DataTemplate(() =>
+				{
+					var itemLayout = new Grid { HeightRequest = itemSize, WidthRequest = itemSize };
+					itemLayout.Add(new Label { Text = "Item" });
+					itemLayouts.Add(itemLayout);
+					return itemLayout;
+				}),
+				ItemsSource = Enumerable.Range(0, 4).ToList(),
+				HeightRequest = (itemSize * 2) + spacing,
+				WidthRequest = (itemSize * span) + spacing,
+				HorizontalOptions = LayoutOptions.Start,
+				VerticalOptions = LayoutOptions.Start
+			};
+			var frame = collectionView.Frame;
+
+			await CreateHandlerAndAddToWindow<CollectionViewHandler>(collectionView, async handler =>
+			{
+				await WaitForUIUpdate(frame, collectionView);
+				_ = LayoutAndGetViewHolder(handler.PlatformView);
+				await AssertEventually(() => itemLayouts.Count == 4 && itemLayouts.All(l => l.ToPlatform().IsLoaded()));
+
+				var layoutManager = handler.PlatformView.GetLayoutManager();
+				var spacingPx = (int)handler.PlatformView.Context.ToPixels(spacing);
+
+				// Grab the RecyclerView's direct children (the cell roots), not the item template's own
+				// content view, since RecyclerView.ItemDecoration insets apply to the direct RecyclerView child.
+				var cells = itemLayouts
+					.Select(l => l.ToPlatform().GetParentOfType<ItemContentView>())
+					.Cast<AView>()
+					.ToList();
+
+				// Row 0 (top-left / top-right), Row 1 (bottom-left / bottom-right).
+				var topLeft = cells[0];
+				var topRight = cells[1];
+				var bottomLeft = cells[2];
+				var bottomRight = cells[3];
+
+				// No spacing should ever be applied to the outer-left or outer-top edges.
+				Assert.Equal(0, layoutManager.GetLeftDecorationWidth(topLeft));
+				Assert.Equal(0, layoutManager.GetTopDecorationHeight(topLeft));
+
+				// Cross-axis outer edge (rightmost column): no outer-right spacing.
+				Assert.Equal(0, layoutManager.GetRightDecorationWidth(topRight));
+				Assert.Equal(0, layoutManager.GetLeftDecorationWidth(topRight));
+
+				// Spacing between the two columns is applied exactly once (on the left item's right edge).
+				Assert.Equal(spacingPx, layoutManager.GetRightDecorationWidth(topLeft));
+
+				// Spacing between the two rows is applied exactly once (on the top row's bottom edge).
+				Assert.Equal(spacingPx, layoutManager.GetBottomDecorationHeight(topLeft));
+				Assert.Equal(spacingPx, layoutManager.GetBottomDecorationHeight(topRight));
+				Assert.Equal(0, layoutManager.GetTopDecorationHeight(bottomLeft));
+				Assert.Equal(0, layoutManager.GetTopDecorationHeight(bottomRight));
+
+				// Last row (outer-bottom edge) and last column (outer-right edge) get no extra spacing.
+				Assert.Equal(0, layoutManager.GetBottomDecorationHeight(bottomLeft));
+				Assert.Equal(0, layoutManager.GetBottomDecorationHeight(bottomRight));
+				Assert.Equal(0, layoutManager.GetRightDecorationWidth(bottomRight));
+				Assert.Equal(spacingPx, layoutManager.GetRightDecorationWidth(bottomLeft));
+			});
+		}
+
+		[Fact(DisplayName = "Grid CollectionView spacing applies only between items, not on outer edges (RightToLeft)")]
+		public async Task GridItemsLayoutSpacingAppliesOnlyBetweenItemsRightToLeft()
+		{
+			SetupBuilder();
+
+			const double itemSize = 50;
+			const double spacing = 20;
+			const int span = 2;
+
+			var itemLayouts = new List<Grid>();
+
+			var collectionView = new CollectionView
+			{
+				FlowDirection = FlowDirection.RightToLeft,
+				ItemsLayout = new GridItemsLayout(span, ItemsLayoutOrientation.Vertical)
+				{
+					HorizontalItemSpacing = spacing,
+					VerticalItemSpacing = spacing
+				},
+				ItemTemplate = new DataTemplate(() =>
+				{
+					var itemLayout = new Grid { HeightRequest = itemSize, WidthRequest = itemSize };
+					itemLayout.Add(new Label { Text = "Item" });
+					itemLayouts.Add(itemLayout);
+					return itemLayout;
+				}),
+				ItemsSource = Enumerable.Range(0, 4).ToList(),
+				HeightRequest = (itemSize * 2) + spacing,
+				WidthRequest = (itemSize * span) + spacing,
+				HorizontalOptions = LayoutOptions.Start,
+				VerticalOptions = LayoutOptions.Start
+			};
+			var frame = collectionView.Frame;
+
+			await CreateHandlerAndAddToWindow<CollectionViewHandler>(collectionView, async handler =>
+			{
+				await WaitForUIUpdate(frame, collectionView);
+				_ = LayoutAndGetViewHolder(handler.PlatformView);
+				await AssertEventually(() => itemLayouts.Count == 4 && itemLayouts.All(l => l.ToPlatform().IsLoaded()));
+
+				var layoutManager = handler.PlatformView.GetLayoutManager();
+				var spacingPx = (int)handler.PlatformView.Context.ToPixels(spacing);
+
+				Assert.Equal(ALayoutDirection.Rtl, handler.PlatformView.LayoutDirection);
+
+				// Row 0 (top-left / top-right), Row 1 (bottom-left / bottom-right). In RTL,
+				// GridLayoutManager flips physical column placement: adapter/span index 0
+				// renders physically rightmost, span index 1 renders physically leftmost.
+				var cells = itemLayouts
+					.Select(l => l.ToPlatform().GetParentOfType<ItemContentView>())
+					.Cast<AView>()
+					.ToList();
+
+				var topRight = cells[0];
+				var topLeft = cells[1];
+				var bottomRight = cells[2];
+				var bottomLeft = cells[3];
+
+				// Physically leftmost column (last span index) gets no outer-left spacing,
+				// and no spacing on its right edge either (that edge faces the other column,
+				// whose left edge carries the between-columns spacing instead).
+				Assert.Equal(0, layoutManager.GetLeftDecorationWidth(topLeft));
+				Assert.Equal(0, layoutManager.GetTopDecorationHeight(topLeft));
+				Assert.Equal(0, layoutManager.GetRightDecorationWidth(topLeft));
+
+				// Cross-axis outer edge (physically rightmost column, first span index):
+				// no outer-right spacing.
+				Assert.Equal(0, layoutManager.GetRightDecorationWidth(topRight));
+
+				// Spacing between the two columns is applied exactly once (on the physically
+				// right item's left edge, since RTL mirrors which physical side gets the offset).
+				Assert.Equal(spacingPx, layoutManager.GetLeftDecorationWidth(topRight));
+
+				// Spacing between the two rows is applied exactly once (on the top row's bottom edge).
+				Assert.Equal(spacingPx, layoutManager.GetBottomDecorationHeight(topLeft));
+				Assert.Equal(spacingPx, layoutManager.GetBottomDecorationHeight(topRight));
+				Assert.Equal(0, layoutManager.GetTopDecorationHeight(bottomLeft));
+				Assert.Equal(0, layoutManager.GetTopDecorationHeight(bottomRight));
+
+				// Last row (outer-bottom edge) and last column (physically leftmost column) get no extra spacing.
+				Assert.Equal(0, layoutManager.GetBottomDecorationHeight(bottomLeft));
+				Assert.Equal(0, layoutManager.GetBottomDecorationHeight(bottomRight));
+				Assert.Equal(0, layoutManager.GetLeftDecorationWidth(bottomLeft));
+				Assert.Equal(spacingPx, layoutManager.GetLeftDecorationWidth(bottomRight));
 			});
 		}
 
