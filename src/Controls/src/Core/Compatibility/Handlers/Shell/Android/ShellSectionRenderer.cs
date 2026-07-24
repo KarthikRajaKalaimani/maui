@@ -367,22 +367,19 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 		void EnsureAccessibilityLayoutListener(AndroidX.RecyclerView.Widget.RecyclerView recyclerView)
 		{
-			if (_a11yLayoutListener != null)
+			if (_a11yLayoutListener == null)
 			{
-				// Re-apply immediately (in case the current item view was just replaced during
-				// an adapter change and no layout pass has happened yet).
-				_a11yLayoutListener.MarkAttachedItemViews();
-				return;
-
-			for (int i = 0; i < recyclerView.ChildCount; i++)
-			{
-				var itemView = recyclerView.GetChildAt(i);
-				if (itemView != null)
-				{
-					itemView.ImportantForAccessibility = ImportantForAccessibility.No;
-					MarkIntermediateContainersNotImportant(itemView);
-				}
+				_a11yLayoutListener = new ItemViewAccessibilityLayoutListener(recyclerView);
+				var vto = recyclerView.ViewTreeObserver;
+				if (vto != null && vto.IsAlive)
+					vto.AddOnGlobalLayoutListener(_a11yLayoutListener);
 			}
+
+			// Re-apply immediately (covers both first-time setup — so the item view already
+			// attached before the first layout pass fires is marked right away — and adapter
+			// changes where the current item view was just replaced and no layout pass has
+			// happened yet).
+			_a11yLayoutListener.MarkAttachedItemViews();
 		}
 
 		// Marks intermediate "pass-through" container ViewGroups between the RecyclerView item view
@@ -449,14 +446,10 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				}
 			}
 
-			_a11yLayoutListener = new ItemViewAccessibilityLayoutListener(recyclerView);
-			var vto = recyclerView.ViewTreeObserver;
-			if (vto != null && vto.IsAlive)
-				vto.AddOnGlobalLayoutListener(_a11yLayoutListener);
-
-			// Apply once now so the very first item view (already attached before the first
-			// layout pass fires the listener) is marked immediately for the test / initial focus.
-			_a11yLayoutListener.MarkAttachedItemViews();
+			public void OnChildViewDetachedFromWindow(AView view)
+			{
+				// No-op: nothing to clean up when an item view is detached/recycled.
+			}
 		}
 
 		// ViewPager2 always has exactly one direct child: its internal RecyclerView.
@@ -508,8 +501,15 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				for (int i = 0; i < count; i++)
 				{
 					var itemView = rv.GetChildAt(i);
-					if (itemView != null && itemView.ImportantForAccessibility != ImportantForAccessibility.No)
-						itemView.ImportantForAccessibility = ImportantForAccessibility.No;
+					if (itemView != null)
+					{
+						if (itemView.ImportantForAccessibility != ImportantForAccessibility.No)
+							itemView.ImportantForAccessibility = ImportantForAccessibility.No;
+
+						// Keep this consistent with ItemViewAccessibilityAttachListener, which
+						// also marks intermediate pass-through containers below the item view.
+						MarkIntermediateContainersNotImportant(itemView);
+					}
 				}
 			}
 		}
