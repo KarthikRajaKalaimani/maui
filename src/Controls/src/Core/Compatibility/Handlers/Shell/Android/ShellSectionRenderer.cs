@@ -77,7 +77,6 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 		IShellToolbarTracker _toolbarTracker;
 		ViewPager2 _viewPager;
 		bool _disposed;
-		ItemViewAccessibilityLayoutListener _a11yLayoutListener;
 		IShellController ShellController => _shellContext.Shell;
 		public event EventHandler AnimationFinished;
 		Fragment IShellObservableFragment.Fragment => this;
@@ -198,10 +197,6 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 		void Destroy()
 		{
-			// Remove the a11y layout listener BEFORE tearing down ViewPager2 so we can still
-			// reach the RecyclerView's ViewTreeObserver.
-			RemoveAccessibilityLayoutListener();
-
 			if (_rootView != null)
 			{
 				// Clean up the coordinator layout and local listener first
@@ -357,29 +352,43 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				// The RecyclerView's item view (the direct container of the fragment's content)
 				// is another merge point. Item views are recycled/replaced under adapter changes,
 				// so we can't set the flag once at startup and be done — a newly attached item
-				// view has ImportantForAccessibility=Yes by default. Use a lightweight global
-				// layout listener that re-applies the flag on every layout pass. The listener
-				// only holds a WeakReference to the RecyclerView (no reference to this renderer),
-				// so it cannot extend renderer lifetime; it is explicitly removed in Destroy().
-				EnsureAccessibilityLayoutListener(recyclerView);
+				// view has ImportantForAccessibility=Yes by default. Attach a
+				// RecyclerView.OnChildAttachStateChangeListener directly on the RecyclerView (added
+				// to/removed from the RecyclerView instance itself, not its ViewTreeObserver) so
+				// each item view is re-marked as it's (re)attached. This intentionally avoids
+				// ViewTreeObserver.IOnGlobalLayoutListener: a view's ViewTreeObserver is merged into
+				// a new instance whenever the view is detached/reattached (e.g. RecyclerView item
+				// recycling), so a listener added to one ViewTreeObserver instance can end up
+				// silently migrated to another one behind our backs — making our own removal a
+				// no-op and leaving a callback registered into an already-disposed managed peer,
+				// which crashes native-side with "Unable to activate instance ... from native
+				// handle" the next time a layout pass fires. OnChildAttachStateChangeListener has
+				// no such footgun: it's a plain list owned directly by the RecyclerView object.
+				EnsureItemViewAttachListener(recyclerView);
+
+				// Mark any item views already attached (attach-state-change only fires for views
+				// attached *after* this listener is registered), covering first-time setup and
+				// adapter changes where the current item view was just replaced.
+				MarkAttachedItemViews(recyclerView);
 			}
 		}
 
-		void EnsureAccessibilityLayoutListener(AndroidX.RecyclerView.Widget.RecyclerView recyclerView)
+		static void MarkAttachedItemViews(AndroidX.RecyclerView.Widget.RecyclerView recyclerView)
 		{
-			if (_a11yLayoutListener == null)
+			int count = recyclerView.ChildCount;
+			for (int i = 0; i < count; i++)
 			{
-				_a11yLayoutListener = new ItemViewAccessibilityLayoutListener(recyclerView);
-				var vto = recyclerView.ViewTreeObserver;
-				if (vto != null && vto.IsAlive)
-					vto.AddOnGlobalLayoutListener(_a11yLayoutListener);
-			}
+				var itemView = recyclerView.GetChildAt(i);
+				if (itemView != null)
+				{
+					if (itemView.ImportantForAccessibility != ImportantForAccessibility.No)
+						itemView.ImportantForAccessibility = ImportantForAccessibility.No;
 
-			// Re-apply immediately (covers both first-time setup — so the item view already
-			// attached before the first layout pass fires is marked right away — and adapter
-			// changes where the current item view was just replaced and no layout pass has
-			// happened yet).
-			_a11yLayoutListener.MarkAttachedItemViews();
+					// Keep this consistent with ItemViewAccessibilityAttachListener, which
+					// also marks intermediate pass-through containers below the item view.
+					MarkIntermediateContainersNotImportant(itemView);
+				}
+			}
 		}
 
 		// Marks intermediate "pass-through" container ViewGroups between the RecyclerView item view
@@ -459,59 +468,6 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				return null;
 
 			return _viewPager.GetChildAt(0) as AndroidX.RecyclerView.Widget.RecyclerView;
-		}
-
-		void RemoveAccessibilityLayoutListener()
-		{
-			if (_a11yLayoutListener == null)
-				return;
-
-			var rv = _a11yLayoutListener.TryGetRecyclerView();
-			if (rv != null)
-			{
-				var vto = rv.ViewTreeObserver;
-				if (vto != null && vto.IsAlive)
-					vto.RemoveOnGlobalLayoutListener(_a11yLayoutListener);
-			}
-
-			_a11yLayoutListener.Dispose();
-			_a11yLayoutListener = null;
-		}
-
-		sealed class ItemViewAccessibilityLayoutListener : Java.Lang.Object, ViewTreeObserver.IOnGlobalLayoutListener
-		{
-			readonly WeakReference<AndroidX.RecyclerView.Widget.RecyclerView> _rvRef;
-
-			public ItemViewAccessibilityLayoutListener(AndroidX.RecyclerView.Widget.RecyclerView rv)
-			{
-				_rvRef = new WeakReference<AndroidX.RecyclerView.Widget.RecyclerView>(rv);
-			}
-
-			public AndroidX.RecyclerView.Widget.RecyclerView TryGetRecyclerView()
-				=> _rvRef.TryGetTarget(out var rv) ? rv : null;
-
-			public void OnGlobalLayout() => MarkAttachedItemViews();
-
-			public void MarkAttachedItemViews()
-			{
-				if (!_rvRef.TryGetTarget(out var rv) || rv == null)
-					return;
-
-				int count = rv.ChildCount;
-				for (int i = 0; i < count; i++)
-				{
-					var itemView = rv.GetChildAt(i);
-					if (itemView != null)
-					{
-						if (itemView.ImportantForAccessibility != ImportantForAccessibility.No)
-							itemView.ImportantForAccessibility = ImportantForAccessibility.No;
-
-						// Keep this consistent with ItemViewAccessibilityAttachListener, which
-						// also marks intermediate pass-through containers below the item view.
-						MarkIntermediateContainersNotImportant(itemView);
-					}
-				}
-			}
 		}
 
 		protected virtual void SetViewPager2UserInputEnabled(bool value)
