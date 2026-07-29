@@ -208,8 +208,6 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 					: Orientation.Vertical,
 
 				Span = gridItemsLayout.Span,
-				HorizontalItemSpacing = gridItemsLayout.HorizontalItemSpacing,
-				VerticalItemSpacing = gridItemsLayout.VerticalItemSpacing,
 				ItemContainerStyle = GetItemContainerStyle(gridItemsLayout)
 			};
 
@@ -249,7 +247,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 		{
 			var h = layout?.HorizontalItemSpacing ?? 0;
 			var v = layout?.VerticalItemSpacing ?? 0;
-			var margin = WinUIHelpers.CreateThickness(0, 0, 0, 0);
+			var margin = WinUIHelpers.CreateThickness(h, v, h, v);
 
 			var style = new WStyle(typeof(GridViewItem));
 
@@ -322,8 +320,6 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			if (ListViewBase is FormsGridView formsGridView && Layout is GridItemsLayout gridLayout)
 			{
 				formsGridView.ItemContainerStyle = GetItemContainerStyle(gridLayout);
-				formsGridView.HorizontalItemSpacing = gridLayout.HorizontalItemSpacing;
-				formsGridView.VerticalItemSpacing = gridLayout.VerticalItemSpacing;
 			}
 
 			if (Layout is LinearItemsLayout linearItemsLayout)

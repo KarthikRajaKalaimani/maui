@@ -31,8 +31,6 @@ namespace Microsoft.Maui.Controls.Platform
 			ChoosingItemContainer += OnChoosingItemContainer;
 		}
 
-		public double HorizontalItemSpacing { get; set; }
-		public double VerticalItemSpacing { get; set; }
 
 		public int Span
 		{
@@ -176,28 +174,6 @@ namespace Microsoft.Maui.Controls.Platform
 		{
 			GroupFooterItemTemplateContext.EnsureSelectionDisabled(element, item);
 			base.PrepareContainerForItemOverride(element, item);
-
-			if (element is not GridViewItem container)
-      			return;
-
- 			int index = IndexFromContainer(element);
-  			int totalItems = Items.Count;
-
- 			int col = index % Span;
-  			int row = index / Span;
- 			int totalRows = (int)Math.Ceiling((double)totalItems / Span);
-
-  			bool isFirstCol = col == 0;
-  			bool isLastCol = col == Span - 1;
-  			bool isFirstRow = row == 0;
-  			bool isLastRow = row == totalRows - 1;
-
-  			double left = isFirstCol ? 0 : HorizontalItemSpacing / 2;
-  			double right = isLastCol ? 0 : HorizontalItemSpacing / 2;
-  			double top = isFirstRow ? 0 : VerticalItemSpacing / 2;
-  			double bottom = isLastRow ? 0 : VerticalItemSpacing / 2;
-
-  			container.Margin = WinUIHelpers.CreateThickness(left, top, right, bottom);
 		}
 
 		void UpdateEmptyViewVisibility(WVisibility visibility)
