@@ -31,7 +31,6 @@ namespace Microsoft.Maui.Controls.Platform
 			ChoosingItemContainer += OnChoosingItemContainer;
 		}
 
-
 		public int Span
 		{
 			get => _span;
