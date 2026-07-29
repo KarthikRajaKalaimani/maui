@@ -164,7 +164,13 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				case ShellNavigationSource.Remove:
 					if (_fragmentMap.TryGetValue(page, out var removeFragment))
 					{
-						if (ChildFragmentManager.Contains(removeFragment.Fragment) && !isForCurrentTab && removeFragment != _currentFragment)
+						// Any fragment that isn't the one currently on screen needs to be explicitly
+						// removed here, regardless of which tab it belongs to. The transaction built
+						// further down only ever removes `_currentFragment`, so if we skip removal
+						// here for same-tab, non-current fragments (e.g. pages popped off the stack
+						// by an absolute navigation), the fragment is left "hidden" but attached to
+						// the FragmentManager forever, leaking the page/view tree it holds on to.
+						if (ChildFragmentManager.Contains(removeFragment.Fragment) && removeFragment != _currentFragment)
 							RemoveFragment(removeFragment.Fragment);
 						_fragmentMap.Remove(page);
 
@@ -406,10 +412,15 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 		void RemoveAllPushedPages(ShellSection shellSection, bool keepCurrent)
 		{
-			if (shellSection.Stack.Count <= 1 || (keepCurrent && shellSection.Stack.Count == 2))
-				return;
-
-			var t = ChildFragmentManager.BeginTransactionEx();
+			// NOTE: We can't gate this on shellSection.Stack.Count here. By the time this runs,
+			// ShellSection.OnPopToRootAsync has already reset its navigation stack down to just
+			// the root page (so Stack.Count is already back to 1), even though the fragments for
+			// the popped pages are still added/hidden in the FragmentManager. Relying on the
+			// (already-reset) Stack.Count caused this method to bail out before removing anything,
+			// leaking one fragment (and its whole page/view tree) per pushed page that gets popped
+			// via an absolute/pop-to-root navigation. Instead, drive removal entirely off of what's
+			// actually still tracked in _fragmentMap for this section.
+			FragmentTransaction t = null;
 
 			foreach (var kvp in _fragmentMap.ToList())
 			{
@@ -421,10 +432,11 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				if (keepCurrent && kvp.Value.Fragment == _currentFragment)
 					continue;
 
+				t ??= ChildFragmentManager.BeginTransactionEx();
 				t.RemoveEx(kvp.Value.Fragment);
 			}
 
-			t.CommitAllowingStateLossEx();
+			t?.CommitAllowingStateLossEx();
 		}
 
 		void RemoveFragment(Fragment fragment)
