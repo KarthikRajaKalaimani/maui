@@ -164,13 +164,7 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 				case ShellNavigationSource.Remove:
 					if (_fragmentMap.TryGetValue(page, out var removeFragment))
 					{
-						// Any fragment that isn't the one currently on screen needs to be explicitly
-						// removed here, regardless of which tab it belongs to. The transaction built
-						// further down only ever removes `_currentFragment`, so if we skip removal
-						// here for same-tab, non-current fragments (e.g. pages popped off the stack
-						// by an absolute navigation), the fragment is left "hidden" but attached to
-						// the FragmentManager forever, leaking the page/view tree it holds on to.
-						if (ChildFragmentManager.Contains(removeFragment.Fragment) && removeFragment != _currentFragment)
+						if (ChildFragmentManager.Contains(removeFragment.Fragment) && !isForCurrentTab && removeFragment != _currentFragment)
 							RemoveFragment(removeFragment.Fragment);
 						_fragmentMap.Remove(page);
 
