@@ -474,6 +474,9 @@ namespace Microsoft.Maui.Controls
 		}
 
 		internal virtual void OnSetDynamicResource(BindableProperty property, string key, SetterSpecificity specificity)
+			=> OnSetDynamicResource(property, key, specificity, useApplicationFallback: true);
+
+		internal virtual void OnSetDynamicResource(BindableProperty property, string key, SetterSpecificity specificity, bool useApplicationFallback)
 		{
 		}
 
@@ -505,6 +508,17 @@ namespace Microsoft.Maui.Controls
 				throw new ArgumentNullException(nameof(key));
 
 			OnSetDynamicResource(property, key, specificity);
+		}
+
+		//FIXME, use specificity
+		internal void SetDynamicResource(BindableProperty property, string key, SetterSpecificity specificity, bool useApplicationFallback)
+		{
+			if (property == null)
+				throw new ArgumentNullException(nameof(property));
+			if (string.IsNullOrEmpty(key))
+				throw new ArgumentNullException(nameof(key));
+
+			OnSetDynamicResource(property, key, specificity, useApplicationFallback);
 		}
 
 		/// <summary>

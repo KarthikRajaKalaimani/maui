@@ -37,7 +37,12 @@ namespace Microsoft.Maui.Controls
 			// RegisterImplicitStyles handles the initial apply via OnImplicitStyleChanged -> SetStyle.
 			// An explicit Apply(Target) call here would double-attach event handlers when
 			// Application.Current.Resources already contains the implicit style (#24152).
-			RegisterImplicitStyles();
+			// useApplicationFallback is false here because this constructor runs from inside the
+			// StyleableElement base ctor, before the derived control's own ctor body executes; resolving
+			// an implicit style from Application.Current.Resources at this point would run the
+			// element's propertyChanged callbacks against a partially-constructed instance (#36822).
+			// The style still applies once the element attaches to a tree (OnParentResourcesChanged).
+			RegisterImplicitStyles(useApplicationFallback: false);
 		}
 
 		public IStyle Style
@@ -160,7 +165,7 @@ namespace Microsoft.Maui.Controls
 			ImplicitStyle = null;
 		}
 
-		void RegisterImplicitStyles()
+		void RegisterImplicitStyles(bool useApplicationFallback)
 		{
 			Type type = TargetType;
 			while (true)
@@ -168,7 +173,7 @@ namespace Microsoft.Maui.Controls
 				BindableProperty implicitStyleProperty = BindableProperty.Create(nameof(ImplicitStyle), typeof(Style), typeof(NavigableElement), default(Style),
 						propertyChanged: (bindable, oldvalue, newvalue) => OnImplicitStyleChanged());
 				_implicitStyles.Add(implicitStyleProperty);
-				Target.SetDynamicResource(implicitStyleProperty, type.FullName);
+				Target.SetDynamicResource(implicitStyleProperty, type.FullName, SetterSpecificity.DynamicResourceSetter, useApplicationFallback);
 				type = type.BaseType;
 				if (s_stopAtTypes.Contains(type))
 					return;
@@ -189,7 +194,9 @@ namespace Microsoft.Maui.Controls
 			Target.SetDynamicResource(implicitStyleProperty, fallbackTypeName);
 
 			//and proceed as usual - RegisterImplicitStyles handles apply via OnImplicitStyleChanged
-			RegisterImplicitStyles();
+			//The target has already completed construction by the time ReRegisterImplicitStyles runs
+			//(e.g. Hot Reload), so the Application.Current resource fallback is safe to use here.
+			RegisterImplicitStyles(useApplicationFallback: true);
 		}
 
 		void SetStyle(IStyle implicitStyle, IList<Style> classStyles, IStyle style)

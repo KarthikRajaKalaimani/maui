@@ -140,6 +140,16 @@ namespace Microsoft.Maui.Controls
 		}
 
 		public static bool TryGetResource(this IElementDefinition element, string key, out object value)
+			=> TryGetResource(element, key, useApplicationFallback: true, out value);
+
+		// The useApplicationFallback parameter guards the XF-previewer fallback below. It is set to false
+		// while an implicit style is registered from within an element's own constructor chain
+		// (StyleableElement -> MergedStyle.RegisterImplicitStyles), so a detached, mid-construction
+		// element cannot resolve an implicit style from Application.Current.Resources and run
+		// propertyChanged callbacks against a partially-constructed instance (#36822). Once the
+		// element attaches to a tree, normal resource inheritance (OnParentResourcesChanged) resolves
+		// the style, matching the documented model.
+		internal static bool TryGetResource(this IElementDefinition element, string key, bool useApplicationFallback, out object value)
 		{
 			if (key == AppThemeBinding.AppThemeResource)
 			{
@@ -166,7 +176,7 @@ namespace Microsoft.Maui.Controls
 			}
 
 			//Fallback for the XF previewer
-			if (Application.Current != null && ((IResourcesProvider)Application.Current).IsResourcesCreated && Application.Current.Resources.TryGetValue(key, out value))
+			if (useApplicationFallback && Application.Current != null && ((IResourcesProvider)Application.Current).IsResourcesCreated && Application.Current.Resources.TryGetValue(key, out value))
 				return true;
 
 			value = null;
