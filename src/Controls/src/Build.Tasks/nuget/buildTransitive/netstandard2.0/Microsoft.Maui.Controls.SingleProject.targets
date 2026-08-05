@@ -87,6 +87,25 @@
   </Target>
 
   <!--
+    Same allow-list computation as _MauiCollectPlatformSpecificCompileItems above,
+    but for *.xaml files instead of $(DefaultLanguageSourceExtension). Custom
+    platform-specific/backend folders (declared via MauiPlatformSpecificFolder) can
+    contain MAUI XAML files too, so this keeps those files in the MauiXaml item
+    group when their folder is active for the current inner build, mirroring the
+    Compile-item allow-list used by _MauiRemovePlatformCompileItems.
+  -->
+  <Target Name="_MauiCollectPlatformSpecificXamlItems"
+          DependsOnTargets="_MauiNormalizePlatformSpecificFolders"
+          BeforeTargets="_MauiRemovePlatformCompileItems"
+          Condition=" '$(SingleProject)' == 'true' and '@(MauiPlatformSpecificFolder)' != '' ">
+    <ItemGroup>
+      <_MauiPlatformSpecificXamlItems
+          Include="$([MSBuild]::EnsureTrailingSlash('%(MauiPlatformSpecificFolder.Identity)'))**/*.xaml"
+          Condition=" ('%(MauiPlatformSpecificFolder.TargetPlatformIdentifiers)' == '' and '%(MauiPlatformSpecificFolder.ActivationValue)' == '' and '%(MauiPlatformSpecificFolder.BackendIdentity)' == '' and '%(MauiPlatformSpecificFolder.ActivationProperty)' == '') or ('$(TargetPlatformIdentifier)' != '' and $([System.Text.RegularExpressions.Regex]::Replace(';%(MauiPlatformSpecificFolder.TargetPlatformIdentifiers);', '\s+', '').ToLowerInvariant().Contains(';$(TargetPlatformIdentifier.ToLowerInvariant());'))) or ('$(TargetPlatformIdentifier)' == '' and '%(MauiPlatformSpecificFolder._MauiActivationValueNormalized)' != '' and '%(MauiPlatformSpecificFolder._MauiResolvedActivationValueNormalized)' == '%(MauiPlatformSpecificFolder._MauiActivationValueNormalized)') " />
+    </ItemGroup>
+  </Target>
+
+  <!--
     Flip ExcludeFromCurrentConfiguration back to false on the kept items so
     Visual Studio's Solution Explorer / IntelliSense renders them as part of
     the active configuration. The blanket <Compile Update> at the top of this
@@ -193,6 +212,47 @@
           Include="$(WindowsProjectFolder)**/*.xaml" />
       <EmbeddedResource Remove="@(_MauiXamlToRemove)" />
       <MauiXaml Remove="@(_MauiXamlToRemove)" />
+
+      <!--
+        Remove MauiXaml/EmbeddedResource items under $(PlatformsProjectFolder) that
+        are not part of the current build configuration. Unlike Compile items,
+        MauiXaml has no ExcludeFromCurrentConfiguration gating, so without this every
+        platform's *.xaml files (e.g. Platforms/Android, Platforms/iOS,
+        Platforms/MacCatalyst) stay in the MauiXaml item group for every inner
+        build/TFM. The XAML SourceGen consumes MauiXaml as AdditionalFiles regardless
+        of platform, so files reusing the same class name across platform folders
+        (a common per-platform partial-page pattern) produce duplicate
+        InitializeComponent/attribute definitions - see dotnet/maui#36951.
+
+        Start from a fresh glob of all Platforms/** xaml (Windows xaml is already
+        handled above and is intentionally excluded from this pass since it is
+        WinUI XAML, not MAUI XAML), then subtract the currently-active built-in
+        platform's own folder plus any custom platform-specific/backend folder kept
+        by _MauiCollectPlatformSpecificXamlItems above.
+      -->
+      <_MauiPlatformXamlToRemove Include="$(PlatformsProjectFolder)**/*.xaml" />
+      <_MauiActivePlatformXaml
+          Condition=" '$(TargetPlatformIdentifier)' == 'android' "
+          Include="$(AndroidProjectFolder)**/*.xaml" />
+      <_MauiActivePlatformXaml
+          Condition=" '$(TargetPlatformIdentifier)' == 'ios' "
+          Include="$(iOSProjectFolder)**/*.xaml" />
+      <_MauiActivePlatformXaml
+          Condition=" '$(TargetPlatformIdentifier)' == 'maccatalyst' "
+          Include="$(MacCatalystProjectFolder)**/*.xaml" />
+      <_MauiActivePlatformXaml
+          Condition=" '$(TargetPlatformIdentifier)' == 'tizen' "
+          Include="$(TizenProjectFolder)**/*.xaml" />
+      <_MauiPlatformXamlToRemove
+          Remove="@(_MauiActivePlatformXaml)"
+          MatchOnMetadata="FullPath"
+          MatchOnMetadataOptions="PathLike" />
+      <_MauiPlatformXamlToRemove
+          Remove="@(_MauiPlatformSpecificXamlItems)"
+          MatchOnMetadata="FullPath"
+          MatchOnMetadataOptions="PathLike" />
+      <EmbeddedResource Remove="@(_MauiPlatformXamlToRemove)" />
+      <MauiXaml Remove="@(_MauiPlatformXamlToRemove)" />
     </ItemGroup>
 
   </Target>
