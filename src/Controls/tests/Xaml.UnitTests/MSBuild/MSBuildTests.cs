@@ -723,7 +723,7 @@ public static class Entry
 			var projectFile = IOPath.Combine(tempDirectory, "test.csproj");
 			project.Save(projectFile);
 
-			var log = Build(projectFile);
+			var log = Build(projectFile, target: "_MauiRemovePlatformCompileItems");
 
 			// Normalize separators since Identity may render with '/' or '\' depending on OS.
 			var itemsLine = log.Split('\n').FirstOrDefault(l => l.Contains("MAUIXAML_ITEMS:", StringComparison.OrdinalIgnoreCase)) ?? "";
@@ -736,6 +736,74 @@ public static class Entry
 			{
 				Assert.DoesNotContain($"Platforms/{folder}/TestPage.xaml", normalizedItemsLine, StringComparison.OrdinalIgnoreCase);
 			}
+		}
+
+		[Theory]
+		[InlineData("ios", true, true)]
+		[InlineData("maccatalyst", true, false)]
+		[InlineData("android", false, true)]
+		[InlineData("windows", false, false)]
+		public void SingleProject_RemovePlatformCompileItems_RespectsSharedAndCustomPlatformMauiXamlFolders(
+			string targetPlatformIdentifier,
+			bool shouldKeepAppleFolder,
+			bool shouldKeepExternalFolder)
+		{
+			SetUp();
+			var project = NewElement("Project").WithAttribute("Sdk", "Microsoft.NET.Sdk");
+			var propertyGroup = NewElement("PropertyGroup");
+			propertyGroup.Add(NewElement("TargetFramework").WithValue(GetTfm()));
+			propertyGroup.Add(NewElement("SingleProject").WithValue("true"));
+			propertyGroup.Add(NewElement("TargetPlatformIdentifier").WithValue(targetPlatformIdentifier));
+			propertyGroup.Add(NewElement("iOSProjectFolder").WithValue("Platforms\\Apple\\"));
+			propertyGroup.Add(NewElement("MacCatalystProjectFolder").WithValue("Platforms\\Apple\\"));
+			project.Add(propertyGroup);
+
+			var beforeTargetsPath = AssemblyInfoTests.GetFilePathFromRoot(IOPath.Combine("src", "Controls", "src", "Build.Tasks", "nuget", "buildTransitive", "netstandard2.0", "Microsoft.Maui.Controls.SingleProject.Before.targets"));
+			project.Add(NewElement("Import").WithAttribute("Project", beforeTargetsPath));
+
+			var platformFolders = NewElement("ItemGroup");
+			platformFolders.Add(NewElement("MauiPlatformSpecificFolder")
+				.WithAttribute("Include", "External\\Custom")
+				.WithAttribute("TargetPlatformIdentifiers", " android; ios "));
+			project.Add(platformFolders);
+
+			var xamlFiles = new[]
+			{
+				"Platforms\\Apple\\ApplePage.xaml",
+				"Platforms\\Shared\\UnknownPage.xaml",
+				"External\\Custom\\ExternalPage.xaml",
+				"SharedPage.xaml",
+			};
+			var xamlItems = NewElement("ItemGroup");
+			foreach (var xamlFile in xamlFiles)
+			{
+				WriteFile(xamlFile, Xaml.SharedPage);
+				xamlItems.Add(NewElement("MauiXaml").WithAttribute("Include", xamlFile));
+			}
+			project.Add(xamlItems);
+
+			var targetsPath = AssemblyInfoTests.GetFilePathFromRoot(IOPath.Combine("src", "Controls", "src", "Build.Tasks", "nuget", "buildTransitive", "netstandard2.0", "Microsoft.Maui.Controls.SingleProject.targets"));
+			project.Add(NewElement("Import").WithAttribute("Project", targetsPath));
+
+			var dumpTarget = NewElement("Target")
+				.WithAttribute("Name", "_TestDumpMauiXamlItems")
+				.WithAttribute("AfterTargets", "_MauiRemovePlatformCompileItems");
+			dumpTarget.Add(NewElement("Message")
+				.WithAttribute("Importance", "high")
+				.WithAttribute("Text", "MAUIXAML_ITEMS: @(MauiXaml->'%(Identity)', '|')"));
+			project.Add(dumpTarget);
+
+			var projectFile = IOPath.Combine(tempDirectory, "test.csproj");
+			project.Save(projectFile);
+
+			var log = Build(projectFile, target: "_MauiRemovePlatformCompileItems");
+			var itemsLine = log.Split('\n').FirstOrDefault(l => l.Contains("MAUIXAML_ITEMS:", StringComparison.OrdinalIgnoreCase)) ?? "";
+			var normalizedItemsLine = itemsLine.Replace('\\', '/');
+
+			Assert.Contains("SharedPage.xaml", normalizedItemsLine, StringComparison.OrdinalIgnoreCase);
+			Assert.DoesNotContain("Platforms/Shared/UnknownPage.xaml", normalizedItemsLine, StringComparison.OrdinalIgnoreCase);
+			Assert.Equal(shouldKeepAppleFolder, normalizedItemsLine.Contains("Platforms/Apple/ApplePage.xaml", StringComparison.OrdinalIgnoreCase));
+			Assert.Equal(shouldKeepExternalFolder, normalizedItemsLine.Contains("External/Custom/ExternalPage.xaml", StringComparison.OrdinalIgnoreCase));
 		}
 
 		// Windows xaml is WinUI markup, not MAUI XAML, and is never consumed by the MAUI XAML
@@ -804,7 +872,7 @@ public static class Entry
 			var projectFile = IOPath.Combine(tempDirectory, "test.csproj");
 			project.Save(projectFile);
 
-			var log = Build(projectFile);
+			var log = Build(projectFile, target: "_MauiRemovePlatformCompileItems");
 
 			var itemsLine = log.Split('\n').FirstOrDefault(l => l.Contains("MAUIXAML_ITEMS:", StringComparison.OrdinalIgnoreCase)) ?? "";
 			var normalizedItemsLine = itemsLine.Replace('\\', '/');
