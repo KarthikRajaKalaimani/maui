@@ -666,7 +666,7 @@ namespace Microsoft.Maui.Controls.MSBuild.UnitTests
 			propertyGroup.Add(NewElement("SingleProject").WithValue("true"));
 			propertyGroup.Add(NewElement("EnableDefaultCompileItems").WithValue("false"));
 			propertyGroup.Add(NewElement("EnableDefaultEmbeddedResourceItems").WithValue("false"));
-			// Fake the active platform without requiring the real platform TFM/workload to be installed.
+			// The identity is consumed only by the target under test; no platform build or restore runs.
 			propertyGroup.Add(NewElement("TargetPlatformIdentifier").WithValue(targetPlatformIdentifier));
 			project.Add(propertyGroup);
 
@@ -723,7 +723,7 @@ public static class Entry
 			var projectFile = IOPath.Combine(tempDirectory, "test.csproj");
 			project.Save(projectFile);
 
-			var log = Build(projectFile);
+			var log = Build(projectFile, target: "_MauiRemovePlatformCompileItems", additionalArgs: "--no-restore");
 
 			// Normalize separators since Identity may render with '/' or '\' depending on OS.
 			var itemsLine = log.Split('\n').FirstOrDefault(l => l.Contains("MAUIXAML_ITEMS:", StringComparison.OrdinalIgnoreCase)) ?? "";
@@ -755,7 +755,7 @@ public static class Entry
 			propertyGroup.Add(NewElement("SingleProject").WithValue("true"));
 			propertyGroup.Add(NewElement("EnableDefaultCompileItems").WithValue("false"));
 			propertyGroup.Add(NewElement("EnableDefaultEmbeddedResourceItems").WithValue("false"));
-			// Fake the active platform without requiring the real platform TFM/workload to be installed.
+			// The identity is consumed only by the target under test; no platform build or restore runs.
 			propertyGroup.Add(NewElement("TargetPlatformIdentifier").WithValue("windows"));
 			project.Add(propertyGroup);
 
@@ -804,7 +804,7 @@ public static class Entry
 			var projectFile = IOPath.Combine(tempDirectory, "test.csproj");
 			project.Save(projectFile);
 
-			var log = Build(projectFile);
+			var log = Build(projectFile, target: "_MauiRemovePlatformCompileItems", additionalArgs: "--no-restore");
 
 			var itemsLine = log.Split('\n').FirstOrDefault(l => l.Contains("MAUIXAML_ITEMS:", StringComparison.OrdinalIgnoreCase)) ?? "";
 			var normalizedItemsLine = itemsLine.Replace('\\', '/');
