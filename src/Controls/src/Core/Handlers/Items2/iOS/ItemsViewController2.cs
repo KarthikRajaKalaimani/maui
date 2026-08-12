@@ -60,6 +60,9 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			if (CollectionView.CollectionViewLayout == newLayout)
 				return;
 
+			var previousScrollDirection = ScrollDirection;
+			var previousContentOffset = CollectionView.ContentOffset;
+
 			if (newLayout is UICollectionViewCompositionalLayout compositionalLayout)
 			{
 				// Note: on carousel layout, the scroll direction is always vertical to achieve horizontal paging with snapping.
@@ -77,7 +80,41 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			{
 				// Reload the data so the currently visible cells get laid out according to the new layout
 				ReloadData();
+				CollectionView.CollectionViewLayout.InvalidateLayout();
+				CollectionView.LayoutIfNeeded();
+
+				if (previousScrollDirection == ScrollDirection)
+				{
+					var contentOffset = GetClampedContentOffset(previousContentOffset, ScrollDirection);
+					SeedScrollTracking(contentOffset);
+					CollectionView.ContentOffset = contentOffset;
+				}
+
+				SeedScrollTracking(CollectionView.ContentOffset);
 			}
+		}
+
+		CGPoint GetClampedContentOffset(CGPoint contentOffset, UICollectionViewScrollDirection scrollDirection)
+		{
+			var inset = CollectionView.AdjustedContentInset;
+			var contentSize = CollectionView.CollectionViewLayout.CollectionViewContentSize;
+			var boundsSize = CollectionView.Bounds.Size;
+			var minimumX = -inset.Left;
+			var minimumY = -inset.Top;
+			var maximumX = Math.Max(minimumX, contentSize.Width - boundsSize.Width + inset.Right);
+			var maximumY = Math.Max(minimumY, contentSize.Height - boundsSize.Height + inset.Bottom);
+
+			return scrollDirection == UICollectionViewScrollDirection.Horizontal
+				? new CGPoint(Math.Clamp(contentOffset.X, minimumX, maximumX), minimumY)
+				: new CGPoint(minimumX, Math.Clamp(contentOffset.Y, minimumY, maximumY));
+		}
+
+		void SeedScrollTracking(CGPoint contentOffset)
+		{
+			var inset = CollectionView.ContentInset;
+			(Delegator as IScrollTrackingDelegator)?.SetScrollTracking(
+				contentOffset.X + inset.Left,
+				contentOffset.Y + inset.Top);
 		}
 
 		protected override void Dispose(bool disposing)
@@ -280,15 +317,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			Delegator = CreateDelegator();
 			CollectionView.Delegate = Delegator;
 
-			var contentOffset = CollectionView.ContentOffset;
-
 			CollectionView.SetCollectionViewLayout(ItemsViewLayout, false);
-
-			if (CollectionView.ContentOffset != contentOffset)
-			{
-				(Delegator as IScrollTrackingDelegator)?.ResetScrollTracking();
-				CollectionView.ContentOffset = contentOffset;
-			}
 
 			UpdateEmptyView();
 		}

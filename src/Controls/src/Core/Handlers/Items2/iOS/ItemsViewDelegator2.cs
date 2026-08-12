@@ -33,6 +33,12 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			PreviousVerticalOffset = 0;
 		}
 
+		void IScrollTrackingDelegator.SetScrollTracking(double horizontalOffset, double verticalOffset)
+		{
+			PreviousHorizontalOffset = (float)horizontalOffset;
+			PreviousVerticalOffset = (float)verticalOffset;
+		}
+
 		public override void Scrolled(UIScrollView scrollView)
 		{
 			var (visibleItems, firstVisibleItemIndex, centerItemIndex, lastVisibleItemIndex) = GetVisibleItemsIndex();
