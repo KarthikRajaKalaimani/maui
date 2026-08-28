@@ -423,7 +423,7 @@ namespace Microsoft.Maui.Controls
 			RaiseValuesChanged(new ResourcesChangedEventArgs(values));
 		}
 
-		void RaiseValuesChanged(ResourcesChangedEventArgs e) => _weakEventManager.HandleEvent(this, e, nameof(ValuesChanged));
+		void RaiseValuesChanged(ResourcesChangedEventArgs e) => ValuesChanged?.Invoke(this, e);
 
 		internal void Reload()
 		{
@@ -431,13 +431,7 @@ namespace Microsoft.Maui.Controls
 				OnValuesChanged(mr);
 		}
 
-		readonly WeakEventManager _weakEventManager = new WeakEventManager();
-
-		event EventHandler<ResourcesChangedEventArgs> ValuesChanged
-		{
-			add => _weakEventManager.AddEventHandler(value);
-			remove => _weakEventManager.RemoveEventHandler(value);
-		}
+		event EventHandler<ResourcesChangedEventArgs> ValuesChanged;
 
 		//only used for unit testing
 		internal static void ClearCache() => s_instances = new ConditionalWeakTable<Type, ResourceDictionary>();

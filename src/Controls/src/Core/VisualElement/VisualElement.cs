@@ -301,6 +301,8 @@ namespace Microsoft.Maui.Controls
 		EventHandler _backgroundChanged, _clipChanged;
 		WeakNotifyPropertyChangedProxy _shadowProxy = null;
 		PropertyChangedEventHandler _shadowChanged;
+		WeakResourceDictionaryChangedProxy _resourcesChangedProxy;
+		EventHandler<ResourcesChangedEventArgs> _resourcesChanged;
 
 		/// <summary>
 		/// Frees all resources associated with the handle.
@@ -310,6 +312,7 @@ namespace Microsoft.Maui.Controls
 			_clipProxy?.Unsubscribe();
 			_backgroundProxy?.Unsubscribe();
 			_shadowProxy?.Unsubscribe();
+			_resourcesChangedProxy?.Unsubscribe();
 		}
 
 		void NotifyBackgroundChanges()
@@ -1174,7 +1177,7 @@ namespace Microsoft.Maui.Controls
 				if (_resources != null)
 					return _resources;
 				_resources = new ResourceDictionary();
-				((IResourceDictionary)_resources).ValuesChanged += OnResourcesChanged;
+				SubscribeToResourcesChanged(_resources);
 				return _resources;
 			}
 			set
@@ -1182,14 +1185,20 @@ namespace Microsoft.Maui.Controls
 				if (_resources == value)
 					return;
 				OnPropertyChanging();
-				if (_resources != null)
-					((IResourceDictionary)_resources).ValuesChanged -= OnResourcesChanged;
+				_resourcesChangedProxy?.Unsubscribe();
 				_resources = value;
 				OnResourcesChanged(value);
 				if (_resources != null)
-					((IResourceDictionary)_resources).ValuesChanged += OnResourcesChanged;
+					SubscribeToResourcesChanged(_resources);
 				OnPropertyChanged();
 			}
+		}
+
+		void SubscribeToResourcesChanged(IResourceDictionary resources)
+		{
+			_resourcesChanged ??= OnResourcesChanged;
+			_resourcesChangedProxy ??= new WeakResourceDictionaryChangedProxy();
+			_resourcesChangedProxy.Subscribe(resources, _resourcesChanged);
 		}
 
 		/// <summary>
