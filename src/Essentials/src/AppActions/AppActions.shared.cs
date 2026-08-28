@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 #if ANDROID
 using Android.Content;
@@ -111,9 +112,11 @@ namespace Microsoft.Maui.ApplicationModel
 		/// </summary>
 		public static event EventHandler<AppActionEventArgs>? OnAppAction
 		{
-			add => Current.AppActionActivated += value;
-			remove => Current.AppActionActivated -= value;
+			add => s_weakRelay.AddHandler(value);
+			remove => s_weakRelay.RemoveHandler(value);
 		}
+
+		static readonly WeakEventRelay s_weakRelay = new();
 
 		static IAppActions? currentImplementation;
 
@@ -121,10 +124,141 @@ namespace Microsoft.Maui.ApplicationModel
 		/// Provides the default implementation for static usage of this API.
 		/// </summary>
 		public static IAppActions Current =>
-			currentImplementation ??= new AppActionsImplementation();
+			currentImplementation ??= CreateAndWire();
 
-		internal static void SetCurrent(IAppActions? implementation) =>
+		internal static void SetCurrent(IAppActions? implementation)
+		{
+			if (currentImplementation is not null)
+				currentImplementation.AppActionActivated -= s_weakRelay.OnSourceEvent;
+
 			currentImplementation = implementation;
+
+			if (currentImplementation is not null)
+				currentImplementation.AppActionActivated += s_weakRelay.OnSourceEvent;
+		}
+
+		static IAppActions CreateAndWire()
+		{
+			var impl = new AppActionsImplementation();
+			impl.AppActionActivated += s_weakRelay.OnSourceEvent;
+			return impl;
+		}
+	}
+
+	/// <summary>
+	/// Manages weak-reference subscriptions so that subscribers to a static event
+	/// are not prevented from being garbage-collected.
+	/// </summary>
+	sealed class WeakEventRelay
+	{
+		readonly object _lock = new();
+		readonly List<Subscription> _subscriptions = new();
+
+		public void AddHandler(EventHandler<AppActionEventArgs>? handler)
+		{
+			if (handler is null)
+				return;
+
+			lock (_lock)
+			{
+				_subscriptions.Add(new Subscription(handler));
+			}
+		}
+
+		public void RemoveHandler(EventHandler<AppActionEventArgs>? handler)
+		{
+			if (handler is null)
+				return;
+
+			lock (_lock)
+			{
+				for (int i = _subscriptions.Count - 1; i >= 0; i--)
+				{
+					var sub = _subscriptions[i];
+					if (sub.Matches(handler) || !sub.IsAlive)
+					{
+						_subscriptions.RemoveAt(i);
+					}
+				}
+			}
+		}
+
+		internal void OnSourceEvent(object? sender, AppActionEventArgs args)
+		{
+			Subscription[] snapshot;
+			lock (_lock)
+			{
+				snapshot = _subscriptions.ToArray();
+			}
+
+			List<int>? dead = null;
+			for (int i = 0; i < snapshot.Length; i++)
+			{
+				if (!snapshot[i].TryInvoke(sender, args))
+				{
+					dead ??= new List<int>();
+					dead.Add(i);
+				}
+			}
+
+			if (dead is not null)
+			{
+				lock (_lock)
+				{
+					// Remove dead entries (iterate backwards)
+					for (int i = _subscriptions.Count - 1; i >= 0; i--)
+					{
+						if (!_subscriptions[i].IsAlive)
+							_subscriptions.RemoveAt(i);
+					}
+				}
+			}
+		}
+
+		readonly struct Subscription
+		{
+			readonly WeakReference<object>? _targetRef;
+			readonly MethodInfo _method;
+
+			// For static delegates, target is null — store nothing (static delegates never leak).
+			public Subscription(EventHandler<AppActionEventArgs> handler)
+			{
+				_method = handler.Method;
+				_targetRef = handler.Target is not null ? new WeakReference<object>(handler.Target) : null;
+			}
+
+			public bool IsAlive =>
+				_targetRef is null || _targetRef.TryGetTarget(out _);
+
+			public bool Matches(EventHandler<AppActionEventArgs> handler)
+			{
+				if (_method != handler.Method)
+					return false;
+
+				if (_targetRef is null)
+					return handler.Target is null;
+
+				return _targetRef.TryGetTarget(out var target) && ReferenceEquals(target, handler.Target);
+			}
+
+			public bool TryInvoke(object? sender, AppActionEventArgs args)
+			{
+				if (_targetRef is null)
+				{
+					// Static method delegate
+					_method.Invoke(null, new object?[] { sender, args });
+					return true;
+				}
+
+				if (_targetRef.TryGetTarget(out var target))
+				{
+					_method.Invoke(target, new object?[] { sender, args });
+					return true;
+				}
+
+				return false; // target was collected
+			}
+		}
 	}
 
 	/// <summary>
