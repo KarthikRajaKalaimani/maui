@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using Microsoft.Maui.Controls.Internals;
 using Microsoft.Maui.Controls.Shapes;
 
 // NOTE: warning disabled for netstandard projects
@@ -55,6 +56,34 @@ namespace Microsoft.Maui.Controls
 		{
 			_source = null;
 			_handler = null;
+		}
+	}
+
+	class WeakResourceDictionaryChangedProxy : WeakEventProxy<IResourceDictionary, EventHandler<ResourcesChangedEventArgs>>
+	{
+		void OnValuesChanged(object? sender, ResourcesChangedEventArgs e)
+		{
+			if (TryGetHandler(out var handler))
+				handler(sender, e);
+			else
+				Unsubscribe();
+		}
+
+		public override void Subscribe(IResourceDictionary source, EventHandler<ResourcesChangedEventArgs> handler)
+		{
+			if (TryGetSource(out var previousSource))
+				previousSource.ValuesChanged -= OnValuesChanged;
+
+			source.ValuesChanged += OnValuesChanged;
+			base.Subscribe(source, handler);
+		}
+
+		public override void Unsubscribe()
+		{
+			if (TryGetSource(out var source))
+				source.ValuesChanged -= OnValuesChanged;
+
+			base.Unsubscribe();
 		}
 	}
 

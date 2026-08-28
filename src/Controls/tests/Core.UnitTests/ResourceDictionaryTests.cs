@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls.Internals;
 using Xunit;
@@ -68,6 +69,19 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			{
 				throw new XunitException("Changing the value in the dictionary did not fire the changed event.");
 			}
+		}
+
+		[Fact]
+		public async Task ResourceDictionaryKeepsAnonymousSubscriberAliveAfterCollection()
+		{
+			var rd = new ResourceDictionary();
+			var calls = new int[1];
+			((IResourceDictionary)rd).ValuesChanged += (sender, e) => calls[0]++;
+
+			await TestHelpers.Collect();
+			rd.Add("foo", "FOO");
+
+			Assert.Equal(1, calls[0]);
 		}
 
 		[Fact]
@@ -623,27 +637,55 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			Assert.Equal("Foo", label.Text);
 		}
 
+		[Fact]
+		public async Task AddingResourceInMergedRDAfterCollectionTriggersValueChanged()
+		{
+			var merged = new ResourceDictionary();
+			var rd = new ResourceDictionary
+			{
+				MergedDictionaries = { merged }
+			};
+			var label = new Label { Resources = rd };
+			label.SetDynamicResource(Label.TextProperty, "foo");
+
+			await TestHelpers.Collect();
+			merged.Add("foo", "Foo");
+
+			Assert.Equal("Foo", label.Text);
+			GC.KeepAlive(label);
+		}
+
+		[Fact]
+		public async Task AddingStyleSheetAfterCollectionTriggersValueChanged()
+		{
+			var rd = new ResourceDictionary();
+			var calls = new int[1];
+			((IResourceDictionary)rd).ValuesChanged += (sender, e) =>
+			{
+				if (ReferenceEquals(e, ResourcesChangedEventArgs.StyleSheets))
+					calls[0]++;
+			};
+
+			await TestHelpers.Collect();
+			rd.Add(Microsoft.Maui.Controls.StyleSheets.StyleSheet.FromString("label { color: red; }"));
+
+			Assert.Equal(1, calls[0]);
+		}
+
 		// Issue #36389: a shared ResourceDictionary instance assigned to multiple VisualElements should
 		// not root every element for the dictionary's lifetime via the non-weak ValuesChanged subscription.
 		[Fact]
-		public void SharedResourceDictionaryDoesNotLeakSubscribingElements()
+		public async Task SharedResourceDictionaryDoesNotLeakSubscribingElements()
 		{
 			const int elementCount = 30;
 			var shared = new ResourceDictionary { { "Accent", "Red" } };
 
 			var references = MakeElements(shared);
 
-			for (int i = 0; i < 6; i++)
-			{
-				GC.Collect();
-				GC.WaitForPendingFinalizers();
-				GC.Collect();
-			}
+			for (int i = 0; i < references.Count; i++)
+				Assert.False(await references[i].WaitForCollect(), $"Element {i} should not be alive.");
 
-			int alive = references.Count(r => r.IsAlive);
 			GC.KeepAlive(shared);
-
-			Assert.Equal(0, alive);
 
 			[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
 			static List<WeakReference> MakeElements(ResourceDictionary shared)
