@@ -1,3 +1,5 @@
+using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.Animations;
@@ -8,57 +10,128 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 
 	public class AnimationTests : BaseTestFixture
 	{
-		[Fact]
-		public void InsertWithDisabledTickerDoesNotRetainCallback()
+		[Theory]
+		[InlineData(false)]
+		[InlineData(true)]
+		public void AnimationWithDisabledTickerDoesNotRetainCallback(bool useAdd)
 		{
-			var initialTweenerCount = AnimationExtensions.TweenersCounter;
 			using var manager = new AnimationManager(new DisabledTicker());
 
-			AnimationExtensions.Insert(manager, _ => true);
+			var id = AddAnimation(manager, useAdd, null);
 
-			Assert.Equal(initialTweenerCount, AnimationExtensions.TweenersCounter);
+			Assert.False(AnimationExtensions.HasTweener(id));
 		}
 
-		[Fact]
-		public void InsertWithDisposedManagerDoesNotRetainCallback()
+		[Theory]
+		[InlineData(false)]
+		[InlineData(true)]
+		public void AnimationWithDisposedManagerDoesNotRetainCallback(bool useAdd)
 		{
-			var initialTweenerCount = AnimationExtensions.TweenersCounter;
 			var manager = new AnimationManager(new Ticker()) { AutoStartTicker = false };
 			manager.Dispose();
 
-			AnimationExtensions.Insert(manager, _ => true);
+			var id = AddAnimation(manager, useAdd, null);
 
-			Assert.Equal(initialTweenerCount, AnimationExtensions.TweenersCounter);
+			Assert.False(AnimationExtensions.HasTweener(id));
 		}
 
-		[Fact]
-		public void DisposingNonStartingManagerReleasesInsertedCallback()
+		[Theory]
+		[InlineData(false)]
+		[InlineData(true)]
+		public void DisposingNonStartingManagerReleasesCallback(bool useAdd)
 		{
-			var initialTweenerCount = AnimationExtensions.TweenersCounter;
-			var payload = CreateDisposedManagerPayload();
+			var (manager, id, payload) = CreateDisposedManagerPayload(useAdd, autoStartTicker: false);
 
 			CollectGarbage();
 
 			Assert.False(payload.IsAlive);
-			Assert.Equal(initialTweenerCount, AnimationExtensions.TweenersCounter);
+			Assert.False(AnimationExtensions.HasTweener(id));
+			GC.KeepAlive(manager);
+		}
+
+		[Theory]
+		[InlineData(false)]
+		[InlineData(true)]
+		public void DisposingRunningManagerReleasesCallback(bool useAdd)
+		{
+			var (manager, id, payload) = CreateDisposedManagerPayload(useAdd, autoStartTicker: true);
+
+			CollectGarbage();
+
+			Assert.False(payload.IsAlive);
+			Assert.False(AnimationExtensions.HasTweener(id));
+			GC.KeepAlive(manager);
+		}
+
+		[Fact]
+		public void RecommittingAfterRejectedManagerRetainsDisposalCallback()
+		{
+			var rejectedManager = new AnimationManager(new Ticker()) { AutoStartTicker = false };
+			rejectedManager.Dispose();
+			using var liveManager = new AnimationManager(new Ticker()) { AutoStartTicker = false };
+			var disposalNotifications = 0;
+			var animation = new Animation
+			{
+				AnimationManagerDisposed = () => disposalNotifications++
+			};
+
+			animation.Commit(rejectedManager);
+
+			Assert.Null(animation.AnimationManager);
+			Assert.Equal(1, disposalNotifications);
+
+			animation.Commit(liveManager);
+			liveManager.Dispose();
+
+			Assert.Null(animation.AnimationManager);
+			Assert.Equal(2, disposalNotifications);
 		}
 
 		[MethodImpl(MethodImplOptions.NoInlining)]
-		static WeakReference CreateDisposedManagerPayload()
+		static (AnimationManager Manager, int Id, WeakReference Payload) CreateDisposedManagerPayload(bool useAdd, bool autoStartTicker)
 		{
 			var payload = new object();
 			var payloadReference = new WeakReference(payload);
+			using var callbackInvoked = new ManualResetEventSlim();
+			var manager = new AnimationManager(new DisposableTicker()) { AutoStartTicker = autoStartTicker };
+			int id;
 
-			using (var manager = new AnimationManager(new Ticker()) { AutoStartTicker = false })
+			try
 			{
-				AnimationExtensions.Insert(manager, _ =>
+				id = AddAnimation(manager, useAdd, payload, callbackInvoked);
+
+				if (autoStartTicker)
+					Assert.True(callbackInvoked.Wait(TimeSpan.FromSeconds(5)));
+			}
+			finally
+			{
+				manager.Dispose();
+			}
+
+			return (manager, id, payloadReference);
+		}
+
+		static int AddAnimation(
+			IAnimationManager manager,
+			bool useAdd,
+			object payload,
+			ManualResetEventSlim callbackInvoked = null)
+		{
+			if (useAdd)
+			{
+				return AnimationExtensions.Add(manager, _ =>
 				{
+					callbackInvoked?.Set();
 					GC.KeepAlive(payload);
-					return true;
 				});
 			}
 
-			return payloadReference;
+			return AnimationExtensions.Insert(manager, _ =>
+			{
+				callbackInvoked?.Set();
+				GC.KeepAlive(payload);
+				return true;
+			});
 		}
 
 		[MethodImpl(MethodImplOptions.NoInlining)]
@@ -77,6 +150,43 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			public DisabledTicker()
 			{
 				SystemEnabled = false;
+			}
+		}
+
+		sealed class DisposableTicker : Ticker, IDisposable
+		{
+			readonly ManualResetEventSlim _stop = new();
+			Thread _thread;
+
+			public override bool IsRunning => _thread?.IsAlive ?? false;
+
+			public override void Start()
+			{
+				if (IsRunning)
+					return;
+
+				_thread = new Thread(() =>
+				{
+					while (!_stop.IsSet)
+					{
+						Fire?.Invoke();
+						Thread.Yield();
+					}
+				});
+				_thread.Start();
+			}
+
+			public override void Stop()
+			{
+				_stop.Set();
+				if (_thread is not null && Thread.CurrentThread != _thread)
+					_thread.Join();
+			}
+
+			public void Dispose()
+			{
+				Stop();
+				_stop.Dispose();
 			}
 		}
 
