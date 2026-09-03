@@ -93,20 +93,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			var payload = new object();
 			var payloadReference = new WeakReference(payload);
 			using var callbackInvoked = new ManualResetEventSlim();
-			var manager = new AnimationManager(new DisposableTicker()) { AutoStartTicker = autoStartTicker };
-			int id;
+			using var manager = new AnimationManager(new DisposableTicker()) { AutoStartTicker = autoStartTicker };
 
-			try
-			{
-				id = AddAnimation(manager, useAdd, payload, callbackInvoked);
+			var id = AddAnimation(manager, useAdd, payload, callbackInvoked);
 
-				if (autoStartTicker)
-					Assert.True(callbackInvoked.Wait(TimeSpan.FromSeconds(5)));
-			}
-			finally
-			{
-				manager.Dispose();
-			}
+			if (autoStartTicker)
+				Assert.True(callbackInvoked.Wait(TimeSpan.FromSeconds(5)));
 
 			return (manager, id, payloadReference);
 		}

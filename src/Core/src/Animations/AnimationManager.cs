@@ -56,14 +56,7 @@ namespace Microsoft.Maui.Animations
 		/// <inheritdoc/>
 		public void Remove(Animation animation)
 		{
-			bool shouldEnd;
-			lock (_animationsLock)
-			{
-				_animations.TryRemove(animation);
-				shouldEnd = _animations.Count == 0;
-			}
-
-			if (shouldEnd)
+			if (RemoveAnimation(animation))
 				End();
 		}
 
@@ -96,34 +89,19 @@ namespace Microsoft.Maui.Animations
 			var milliseconds = TimeSpan.FromMilliseconds(now - _lastUpdate).TotalMilliseconds;
 			_lastUpdate = now;
 
-			Animation[] animations;
-			lock (_animationsLock)
-			{
-				animations = [.._animations];
-			}
-
-			foreach (var animation in animations)
+			foreach (var animation in GetAnimationsSnapshot())
 			{
 				OnAnimationTick(animation);
 			}
 
-			bool shouldEnd;
-			lock (_animationsLock)
-			{
-				shouldEnd = _animations.Count == 0;
-			}
-
-			if (shouldEnd)
+			if (!HasAnimations())
 				End();
 
 			void OnAnimationTick(Animation animation)
 			{
 				if (animation.HasFinished)
 				{
-					lock (_animationsLock)
-					{
-						_animations.TryRemove(animation);
-					}
+					RemoveAnimation(animation);
 					animation.RemoveFromParent();
 					return;
 				}
@@ -132,10 +110,7 @@ namespace Microsoft.Maui.Animations
 
 				if (animation.HasFinished)
 				{
-					lock (_animationsLock)
-					{
-						_animations.TryRemove(animation);
-					}
+					RemoveAnimation(animation);
 					animation.RemoveFromParent();
 				}
 			}
@@ -177,13 +152,7 @@ namespace Microsoft.Maui.Animations
 
 		void ForceFinishAnimations()
 		{
-			Animation[] animations;
-			lock (_animationsLock)
-			{
-				animations = [.._animations];
-			}
-
-			foreach (var animation in animations)
+			foreach (var animation in GetAnimationsSnapshot())
 			{
 				ForceFinish(animation);
 			}
@@ -193,11 +162,33 @@ namespace Microsoft.Maui.Animations
 			void ForceFinish(Animation animation)
 			{
 				animation.ForceFinish();
-				lock (_animationsLock)
-				{
-					_animations.TryRemove(animation);
-				}
+				RemoveAnimation(animation);
 				animation.RemoveFromParent();
+			}
+		}
+
+		Animation[] GetAnimationsSnapshot()
+		{
+			lock (_animationsLock)
+			{
+				return [.._animations];
+			}
+		}
+
+		bool RemoveAnimation(Animation animation)
+		{
+			lock (_animationsLock)
+			{
+				_animations.TryRemove(animation);
+				return _animations.Count == 0;
+			}
+		}
+
+		bool HasAnimations()
+		{
+			lock (_animationsLock)
+			{
+				return _animations.Count > 0;
 			}
 		}
 
