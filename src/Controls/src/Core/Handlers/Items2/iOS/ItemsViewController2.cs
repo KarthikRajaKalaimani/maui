@@ -55,7 +55,17 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			ItemsViewLayout = layout;
 		}
 
-		public void UpdateLayout(UICollectionViewLayout newLayout, bool preserveLeadingEdge = false)
+		public void UpdateLayout(UICollectionViewLayout newLayout)
+		{
+			UpdateLayoutCore(newLayout, preserveLeadingEdge: false);
+		}
+
+		internal void UpdateLayoutPreservingLeadingEdge(UICollectionViewLayout newLayout)
+		{
+			UpdateLayoutCore(newLayout, preserveLeadingEdge: true);
+		}
+
+		void UpdateLayoutCore(UICollectionViewLayout newLayout, bool preserveLeadingEdge)
 		{
 			// Ignore calls to this method if the new layout is the same as the old one
 			if (CollectionView.CollectionViewLayout == newLayout)

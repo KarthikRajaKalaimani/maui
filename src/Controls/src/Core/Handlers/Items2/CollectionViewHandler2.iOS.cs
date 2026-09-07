@@ -260,7 +260,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			if (args.PropertyName == nameof(LinearItemsLayout.ItemSpacing) &&
 				sender is LinearItemsLayout { Orientation: ItemsLayoutOrientation.Vertical })
 			{
-				UpdateLayout(preserveLeadingEdge: true);
+				UpdateLayoutPreservingLeadingEdge();
 			}
 			else if (args.PropertyName == nameof(ItemsLayout.SnapPointsAlignment) ||
 				args.PropertyName == nameof(ItemsLayout.SnapPointsType) ||

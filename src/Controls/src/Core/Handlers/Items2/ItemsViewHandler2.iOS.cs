@@ -136,10 +136,27 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 		}
 
 		//TODO: this is being called 2 times on startup, one from OnCreatePlatformView and otehr from the mapper for the layout
-		protected virtual void UpdateLayout(bool preserveLeadingEdge = false)
+		protected virtual void UpdateLayout()
+		{
+			UpdateLayoutCore(preserveLeadingEdge: false);
+		}
+
+		private protected void UpdateLayoutPreservingLeadingEdge()
+		{
+			UpdateLayoutCore(preserveLeadingEdge: true);
+		}
+
+		void UpdateLayoutCore(bool preserveLeadingEdge)
 		{
 			_layout = SelectLayout();
-			Controller?.UpdateLayout(_layout, preserveLeadingEdge);
+			if (preserveLeadingEdge)
+			{
+				Controller?.UpdateLayoutPreservingLeadingEdge(_layout);
+			}
+			else
+			{
+				Controller?.UpdateLayout(_layout);
+			}
 		}
 
 		protected virtual void ScrollToRequested(object sender, ScrollToRequestEventArgs args)
