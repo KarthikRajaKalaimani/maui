@@ -33,14 +33,16 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			PreviousVerticalOffset = 0;
 		}
 
-		void IScrollTrackingDelegator.SetScrollTracking(double horizontalOffset, double verticalOffset)
-		{
-			PreviousHorizontalOffset = (float)horizontalOffset;
-			PreviousVerticalOffset = (float)verticalOffset;
-		}
-
 		public override void Scrolled(UIScrollView scrollView)
 		{
+			if (ViewController?.IsPreservingLeadingEdge == true)
+			{
+				var contentInset = scrollView.ContentInset;
+				PreviousHorizontalOffset = (float)(scrollView.ContentOffset.X + contentInset.Left);
+				PreviousVerticalOffset = (float)(scrollView.ContentOffset.Y + contentInset.Top);
+				return;
+			}
+
 			var (visibleItems, firstVisibleItemIndex, centerItemIndex, lastVisibleItemIndex) = GetVisibleItemsIndex();
 
 			var contentInset = scrollView.ContentInset;

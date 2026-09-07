@@ -35,6 +35,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 		bool _isEmpty = true;
 		bool _emptyViewDisplayed;
 		bool _disposed;
+		bool _isPreservingLeadingEdge;
 
 		[UnconditionalSuppressMessage("Memory", "MEM0002", Justification = "Proven safe in test: MemoryTests.HandlerDoesNotLeak")]
 		UIView _emptyUIView;
@@ -54,68 +55,79 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			ItemsViewLayout = layout;
 		}
 
-		public void UpdateLayout(UICollectionViewLayout newLayout)
+		public void UpdateLayout(UICollectionViewLayout newLayout, bool preserveLeadingEdge = false)
 		{
 			// Ignore calls to this method if the new layout is the same as the old one
 			if (CollectionView.CollectionViewLayout == newLayout)
 				return;
 
-			var previousScrollDirection = ScrollDirection;
-			var previousContentOffset = CollectionView.ContentOffset;
+			var shouldPreserveLeadingEdge = preserveLeadingEdge && IsAtLeadingEdge();
 
-			if (newLayout is UICollectionViewCompositionalLayout compositionalLayout)
+			if (shouldPreserveLeadingEdge)
 			{
-				// Note: on carousel layout, the scroll direction is always vertical to achieve horizontal paging with snapping.
-				// Thanks to it, we can use OrthogonalScrollingBehavior.GroupPagingCentered to scroll the section horizontally.
-				// And even if CarouselView is vertically oriented, each section scrolls horizontally — which results in the carousel-style behavior.
-				ScrollDirection = compositionalLayout.Configuration.ScrollDirection;
+				_isPreservingLeadingEdge = true;
 			}
 
-			ItemsViewLayout = newLayout;
-			_initialized = false;
-
-			EnsureLayoutInitialized();
-
-			if (_initialized)
+			try
 			{
-				// Reload the data so the currently visible cells get laid out according to the new layout
-				ReloadData();
-				CollectionView.CollectionViewLayout.InvalidateLayout();
-				CollectionView.LayoutIfNeeded();
-
-				if (previousScrollDirection == ScrollDirection)
+				if (newLayout is UICollectionViewCompositionalLayout compositionalLayout)
 				{
-					var contentOffset = GetClampedContentOffset(previousContentOffset, ScrollDirection);
-					SeedScrollTracking(contentOffset);
-					CollectionView.ContentOffset = contentOffset;
+					// Note: on carousel layout, the scroll direction is always vertical to achieve horizontal paging with snapping.
+					// Thanks to it, we can use OrthogonalScrollingBehavior.GroupPagingCentered to scroll the section horizontally.
+					// And even if CarouselView is vertically oriented, each section scrolls horizontally — which results in the carousel-style behavior.
+					ScrollDirection = compositionalLayout.Configuration.ScrollDirection;
 				}
 
-				SeedScrollTracking(CollectionView.ContentOffset);
+				ItemsViewLayout = newLayout;
+				_initialized = false;
+
+				EnsureLayoutInitialized();
+
+				if (_initialized)
+				{
+					// Reload the data so the currently visible cells get laid out according to the new layout
+					ReloadData();
+
+					if (shouldPreserveLeadingEdge)
+					{
+						CollectionView.CollectionViewLayout.InvalidateLayout();
+						CollectionView.LayoutIfNeeded();
+						CollectionView.ContentOffset = GetLeadingEdgeContentOffset();
+					}
+				}
+			}
+			finally
+			{
+				if (shouldPreserveLeadingEdge)
+				{
+					try
+					{
+						Delegator?.Scrolled(CollectionView);
+					}
+					finally
+					{
+						_isPreservingLeadingEdge = false;
+					}
+				}
 			}
 		}
 
-		CGPoint GetClampedContentOffset(CGPoint contentOffset, UICollectionViewScrollDirection scrollDirection)
+		bool IsAtLeadingEdge()
 		{
 			var inset = CollectionView.AdjustedContentInset;
-			var contentSize = CollectionView.CollectionViewLayout.CollectionViewContentSize;
-			var boundsSize = CollectionView.Bounds.Size;
-			var minimumX = -inset.Left;
-			var minimumY = -inset.Top;
-			var maximumX = Math.Max(minimumX, contentSize.Width - boundsSize.Width + inset.Right);
-			var maximumY = Math.Max(minimumY, contentSize.Height - boundsSize.Height + inset.Bottom);
 
-			return scrollDirection == UICollectionViewScrollDirection.Horizontal
-				? new CGPoint(Math.Clamp(contentOffset.X, minimumX, maximumX), minimumY)
-				: new CGPoint(minimumX, Math.Clamp(contentOffset.Y, minimumY, maximumY));
+			return ScrollDirection == UICollectionViewScrollDirection.Horizontal
+				? Math.Abs(CollectionView.ContentOffset.X + inset.Left) <= 0.5
+				: Math.Abs(CollectionView.ContentOffset.Y + inset.Top) <= 0.5;
 		}
 
-		void SeedScrollTracking(CGPoint contentOffset)
+		CGPoint GetLeadingEdgeContentOffset()
 		{
-			var inset = CollectionView.ContentInset;
-			(Delegator as IScrollTrackingDelegator)?.SetScrollTracking(
-				contentOffset.X + inset.Left,
-				contentOffset.Y + inset.Top);
+			var inset = CollectionView.AdjustedContentInset;
+			return new CGPoint(-inset.Left, -inset.Top);
 		}
+
+		internal bool IsPreservingLeadingEdge => _isPreservingLeadingEdge;
 
 		protected override void Dispose(bool disposing)
 		{
