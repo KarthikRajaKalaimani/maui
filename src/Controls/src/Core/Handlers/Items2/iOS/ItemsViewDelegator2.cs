@@ -37,9 +37,9 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 		{
 			if (ViewController?.IsPreservingLeadingEdge == true)
 			{
-				var contentInset = scrollView.ContentInset;
-				PreviousHorizontalOffset = (float)(scrollView.ContentOffset.X + contentInset.Left);
-				PreviousVerticalOffset = (float)(scrollView.ContentOffset.Y + contentInset.Top);
+				var trackingInset = scrollView.ContentInset;
+				PreviousHorizontalOffset = (float)(scrollView.ContentOffset.X + trackingInset.Left);
+				PreviousVerticalOffset = (float)(scrollView.ContentOffset.Y + trackingInset.Top);
 				return;
 			}
 
