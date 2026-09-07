@@ -35,7 +35,6 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 		bool _isEmpty = true;
 		bool _emptyViewDisplayed;
 		bool _disposed;
-		bool _isPreservingLeadingEdge;
 
 		[UnconditionalSuppressMessage("Memory", "MEM0002", Justification = "Proven safe in test: MemoryTests.HandlerDoesNotLeak")]
 		UIView _emptyUIView;
@@ -57,87 +56,29 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 
 		public void UpdateLayout(UICollectionViewLayout newLayout)
 		{
-			UpdateLayoutCore(newLayout, preserveLeadingEdge: false);
-		}
-
-		internal void UpdateLayoutPreservingLeadingEdge(UICollectionViewLayout newLayout)
-		{
-			UpdateLayoutCore(newLayout, preserveLeadingEdge: true);
-		}
-
-		void UpdateLayoutCore(UICollectionViewLayout newLayout, bool preserveLeadingEdge)
-		{
 			// Ignore calls to this method if the new layout is the same as the old one
 			if (CollectionView.CollectionViewLayout == newLayout)
 				return;
 
-			var shouldPreserveLeadingEdge = preserveLeadingEdge && IsAtLeadingEdge();
-
-			if (shouldPreserveLeadingEdge)
+			if (newLayout is UICollectionViewCompositionalLayout compositionalLayout)
 			{
-				_isPreservingLeadingEdge = true;
+				// Note: on carousel layout, the scroll direction is always vertical to achieve horizontal paging with snapping.
+				// Thanks to it, we can use OrthogonalScrollingBehavior.GroupPagingCentered to scroll the section horizontally.
+				// And even if CarouselView is vertically oriented, each section scrolls horizontally — which results in the carousel-style behavior.
+				ScrollDirection = compositionalLayout.Configuration.ScrollDirection;
 			}
 
-			try
+			ItemsViewLayout = newLayout;
+			_initialized = false;
+
+			EnsureLayoutInitialized();
+
+			if (_initialized)
 			{
-				if (newLayout is UICollectionViewCompositionalLayout compositionalLayout)
-				{
-					// Note: on carousel layout, the scroll direction is always vertical to achieve horizontal paging with snapping.
-					// Thanks to it, we can use OrthogonalScrollingBehavior.GroupPagingCentered to scroll the section horizontally.
-					// And even if CarouselView is vertically oriented, each section scrolls horizontally — which results in the carousel-style behavior.
-					ScrollDirection = compositionalLayout.Configuration.ScrollDirection;
-				}
-
-				ItemsViewLayout = newLayout;
-				_initialized = false;
-
-				EnsureLayoutInitialized();
-
-				if (_initialized)
-				{
-					// Reload the data so the currently visible cells get laid out according to the new layout
-					ReloadData();
-
-					if (shouldPreserveLeadingEdge)
-					{
-						CollectionView.CollectionViewLayout.InvalidateLayout();
-						CollectionView.LayoutIfNeeded();
-						CollectionView.ContentOffset = GetLeadingEdgeContentOffset();
-					}
-				}
-			}
-			finally
-			{
-				if (shouldPreserveLeadingEdge)
-				{
-					try
-					{
-						Delegator?.Scrolled(CollectionView);
-					}
-					finally
-					{
-						_isPreservingLeadingEdge = false;
-					}
-				}
+				// Reload the data so the currently visible cells get laid out according to the new layout
+				ReloadData();
 			}
 		}
-
-		bool IsAtLeadingEdge()
-		{
-			var inset = CollectionView.AdjustedContentInset;
-
-			return ScrollDirection == UICollectionViewScrollDirection.Horizontal
-				? Math.Abs(CollectionView.ContentOffset.X + inset.Left) <= 0.5
-				: Math.Abs(CollectionView.ContentOffset.Y + inset.Top) <= 0.5;
-		}
-
-		CGPoint GetLeadingEdgeContentOffset()
-		{
-			var inset = CollectionView.AdjustedContentInset;
-			return new CGPoint(-inset.Left, -inset.Top);
-		}
-
-		internal bool IsPreservingLeadingEdge => _isPreservingLeadingEdge;
 
 		protected override void Dispose(bool disposing)
 		{
@@ -339,7 +280,17 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 			Delegator = CreateDelegator();
 			CollectionView.Delegate = Delegator;
 
+			var contentOffset = CollectionView.ContentOffset;
+
 			CollectionView.SetCollectionViewLayout(ItemsViewLayout, false);
+
+			// UIKit already preserves scrolled content when replacing the layout.
+			// Only restore the offset at the origin, where self-sizing can shift the first item out of view.
+			if (contentOffset == CGPoint.Empty && CollectionView.ContentOffset != contentOffset)
+			{
+				(Delegator as IScrollTrackingDelegator)?.ResetScrollTracking();
+				CollectionView.ContentOffset = contentOffset;
+			}
 
 			UpdateEmptyView();
 		}

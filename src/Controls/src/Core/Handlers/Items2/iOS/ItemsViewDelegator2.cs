@@ -35,14 +35,6 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 
 		public override void Scrolled(UIScrollView scrollView)
 		{
-			if (ViewController?.IsPreservingLeadingEdge == true)
-			{
-				var trackingInset = scrollView.ContentInset;
-				PreviousHorizontalOffset = (float)(scrollView.ContentOffset.X + trackingInset.Left);
-				PreviousVerticalOffset = (float)(scrollView.ContentOffset.Y + trackingInset.Top);
-				return;
-			}
-
 			var (visibleItems, firstVisibleItemIndex, centerItemIndex, lastVisibleItemIndex) = GetVisibleItemsIndex();
 
 			var contentInset = scrollView.ContentInset;

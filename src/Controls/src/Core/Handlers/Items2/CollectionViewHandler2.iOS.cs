@@ -257,16 +257,12 @@ namespace Microsoft.Maui.Controls.Handlers.Items2
 
 		void OnItemsLayoutPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs args)
 		{
-			if (args.PropertyName == nameof(LinearItemsLayout.ItemSpacing) &&
-				sender is LinearItemsLayout { Orientation: ItemsLayoutOrientation.Vertical })
-			{
-				UpdateLayoutPreservingLeadingEdge();
-			}
-			else if (args.PropertyName == nameof(ItemsLayout.SnapPointsAlignment) ||
+			if (args.PropertyName == nameof(ItemsLayout.SnapPointsAlignment) ||
 				args.PropertyName == nameof(ItemsLayout.SnapPointsType) ||
 				args.PropertyName == nameof(GridItemsLayout.VerticalItemSpacing) ||
 				args.PropertyName == nameof(GridItemsLayout.HorizontalItemSpacing) ||
-				args.PropertyName == nameof(GridItemsLayout.Span))
+				args.PropertyName == nameof(GridItemsLayout.Span) ||
+				args.PropertyName == nameof(LinearItemsLayout.ItemSpacing))
 			{
 				UpdateLayout();
 			}
