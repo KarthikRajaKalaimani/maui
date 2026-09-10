@@ -54,7 +54,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[InlineData(true)]
 		public void DisposingRunningManagerReleasesCallback(bool useAdd)
 		{
-			var (manager, id, payload) = CreateDisposedManagerPayload(useAdd, autoStartTicker: true);
+			var (manager, ticker, id, payload) = CreateRunningManagerPayload(useAdd);
+
+			Assert.True(ticker.FirstTickCompleted.Wait(TimeSpan.FromSeconds(5)));
+			Assert.True(AnimationExtensions.HasTweener(id));
+
+			manager.Dispose();
 
 			CollectGarbage();
 
@@ -92,15 +97,24 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		{
 			var payload = new object();
 			var payloadReference = new WeakReference(payload);
-			using var callbackInvoked = new ManualResetEventSlim();
-			using var manager = new AnimationManager(new DisposableTicker()) { AutoStartTicker = autoStartTicker };
+			using var manager = new AnimationManager(new Ticker()) { AutoStartTicker = autoStartTicker };
 
-			var id = AddAnimation(manager, useAdd, payload, callbackInvoked);
-
-			if (autoStartTicker)
-				Assert.True(callbackInvoked.Wait(TimeSpan.FromSeconds(5)));
+			var id = AddAnimation(manager, useAdd, payload);
 
 			return (manager, id, payloadReference);
+		}
+
+		[MethodImpl(MethodImplOptions.NoInlining)]
+		static (AnimationManager Manager, ControlledTicker Ticker, int Id, WeakReference Payload) CreateRunningManagerPayload(bool useAdd)
+		{
+			var payload = new object();
+			var payloadReference = new WeakReference(payload);
+			var ticker = new ControlledTicker();
+			var manager = new AnimationManager(ticker);
+
+			var id = AddAnimation(manager, useAdd, payload);
+
+			return (manager, ticker, id, payloadReference);
 		}
 
 		static int AddAnimation(
@@ -145,10 +159,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			}
 		}
 
-		sealed class DisposableTicker : Ticker, IDisposable
+		sealed class ControlledTicker : Ticker, IDisposable
 		{
-			readonly ManualResetEventSlim _stop = new();
+			readonly ManualResetEventSlim _disposed = new();
 			Thread _thread;
+
+			public ManualResetEventSlim FirstTickCompleted { get; } = new();
 
 			public override bool IsRunning => _thread?.IsAlive ?? false;
 
@@ -159,18 +175,16 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 
 				_thread = new Thread(() =>
 				{
-					while (!_stop.IsSet)
-					{
-						Fire?.Invoke();
-						Thread.Yield();
-					}
+					Fire?.Invoke();
+					FirstTickCompleted.Set();
+					_disposed.Wait();
 				});
 				_thread.Start();
 			}
 
 			public override void Stop()
 			{
-				_stop.Set();
+				_disposed.Set();
 				if (_thread is not null && Thread.CurrentThread != _thread)
 					_thread.Join();
 			}
@@ -178,7 +192,8 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			public void Dispose()
 			{
 				Stop();
-				_stop.Dispose();
+				FirstTickCompleted.Dispose();
+				_disposed.Dispose();
 			}
 		}
 

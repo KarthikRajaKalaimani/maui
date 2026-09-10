@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Microsoft.Maui.Animations
 {
@@ -10,6 +11,12 @@ namespace Microsoft.Maui.Animations
 		readonly object _animationsLock = new();
 		long _lastUpdate;
 		bool _disposedValue;
+		int _tickerStartState;
+
+		const int TickerStartIdle = 0;
+		const int TickerStartInProgress = 1;
+		const int TickerDisposed = 2;
+		const int TickerDisposePending = 3;
 
 		/// <summary>
 		/// Instantiate a new <see cref="AnimationManager"/> object.
@@ -35,22 +42,26 @@ namespace Microsoft.Maui.Animations
 		/// <inheritdoc/>
 		public void Add(Animation animation)
 		{
+			var systemEnabled = Ticker.SystemEnabled;
+			var tickerRunning = Ticker.IsRunning;
 			bool rejected;
+			bool startTicker = false;
 			lock (_animationsLock)
 			{
-				rejected = _disposedValue || !Ticker.SystemEnabled;
+				rejected = _disposedValue || !systemEnabled;
 				if (!rejected)
 				{
 					if (!_animations.Contains(animation))
 						_animations.Add(animation);
-					if (!Ticker.IsRunning && AutoStartTicker)
-						Start();
+					startTicker = !tickerRunning && AutoStartTicker;
 				}
 			}
 
 			// If this manager cannot run the animation, release any ownership callback.
 			if (rejected)
 				animation.OnAnimationManagerDisposed(this);
+			else if (startTicker)
+				Start();
 		}
 
 		/// <inheritdoc/>
@@ -62,8 +73,27 @@ namespace Microsoft.Maui.Animations
 
 		void Start()
 		{
-			_lastUpdate = GetCurrentTick();
-			Ticker.Start();
+			if (Interlocked.CompareExchange(ref _tickerStartState, TickerStartInProgress, TickerStartIdle) != TickerStartIdle)
+				return;
+
+			try
+			{
+				lock (_animationsLock)
+				{
+					if (_disposedValue)
+						return;
+
+					_lastUpdate = GetCurrentTick();
+				}
+
+				Ticker.Start();
+			}
+			finally
+			{
+				var state = Interlocked.CompareExchange(ref _tickerStartState, TickerStartIdle, TickerStartInProgress);
+				if (state == TickerDisposePending && Ticker is IDisposable disposable)
+					disposable.Dispose();
+			}
 		}
 
 		void End() =>
@@ -136,10 +166,13 @@ namespace Microsoft.Maui.Animations
 					animation.OnAnimationManagerDisposed(this);
 				}
 
-				if (Ticker is IDisposable disposable)
-				{
+				var state = Interlocked.Exchange(ref _tickerStartState, TickerDisposePending);
+				if (state != TickerStartInProgress && Ticker is IDisposable disposable)
 					disposable.Dispose();
-				}
+			}
+			else
+			{
+				Interlocked.Exchange(ref _tickerStartState, TickerDisposed);
 			}
 		}
 
