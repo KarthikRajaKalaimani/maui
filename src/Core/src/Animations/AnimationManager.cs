@@ -7,7 +7,6 @@ namespace Microsoft.Maui.Animations
 	public class AnimationManager : IAnimationManager, IDisposable
 	{
 		readonly List<Animation> _animations = new();
-		readonly object _animationsLock = new();
 		long _lastUpdate;
 		bool _disposedValue;
 
@@ -35,31 +34,25 @@ namespace Microsoft.Maui.Animations
 		/// <inheritdoc/>
 		public void Add(Animation animation)
 		{
-			bool rejected;
-			bool shouldStart;
-			lock (_animationsLock)
+			// If this manager cannot run the animation, release any ownership callback.
+			if (_disposedValue || !Ticker.SystemEnabled)
 			{
-				rejected = _disposedValue || !Ticker.SystemEnabled;
-				if (!rejected)
-				{
-					if (!_animations.Contains(animation))
-						_animations.Add(animation);
-				}
-
-				shouldStart = !rejected && AutoStartTicker;
+				animation.OnAnimationManagerDisposed(this);
+				return;
 			}
 
-			// If this manager cannot run the animation, release any ownership callback.
-			if (rejected)
-				animation.OnAnimationManagerDisposed(this);
-			else if (shouldStart && !Ticker.IsRunning)
+			if (!_animations.Contains(animation))
+				_animations.Add(animation);
+			if (!Ticker.IsRunning && AutoStartTicker)
 				Start();
 		}
 
 		/// <inheritdoc/>
 		public void Remove(Animation animation)
 		{
-			if (RemoveAnimation(animation))
+			_animations.TryRemove(animation);
+
+			if (_animations.Count == 0)
 				End();
 		}
 
@@ -92,19 +85,21 @@ namespace Microsoft.Maui.Animations
 			var milliseconds = TimeSpan.FromMilliseconds(now - _lastUpdate).TotalMilliseconds;
 			_lastUpdate = now;
 
-			foreach (var animation in GetAnimationsSnapshot())
+			Animation[] animations = [.._animations];
+
+			foreach (var animation in animations)
 			{
 				OnAnimationTick(animation);
 			}
 
-			if (!HasAnimations())
+			if (_animations.Count == 0)
 				End();
 
 			void OnAnimationTick(Animation animation)
 			{
 				if (animation.HasFinished)
 				{
-					RemoveAnimation(animation);
+					_animations.TryRemove(animation);
 					animation.RemoveFromParent();
 					return;
 				}
@@ -113,7 +108,7 @@ namespace Microsoft.Maui.Animations
 
 				if (animation.HasFinished)
 				{
-					RemoveAnimation(animation);
+					_animations.TryRemove(animation);
 					animation.RemoveFromParent();
 				}
 			}
@@ -121,26 +116,23 @@ namespace Microsoft.Maui.Animations
 
 		protected virtual void Dispose(bool disposing)
 		{
-			Animation[] animations;
-			lock (_animationsLock)
+			if (!_disposedValue)
 			{
-				if (_disposedValue)
-					return;
-
 				_disposedValue = true;
-				animations = [.._animations];
-				_animations.Clear();
-			}
 
-			if (disposing)
-			{
-				foreach (var animation in animations)
+				if (disposing)
 				{
-					animation.OnAnimationManagerDisposed(this);
-				}
+					Animation[] animations = [.._animations];
+					_animations.Clear();
 
-				if (Ticker is IDisposable disposable)
-					disposable.Dispose();
+					foreach (var animation in animations)
+					{
+						animation.OnAnimationManagerDisposed(this);
+					}
+
+					if (Ticker is IDisposable disposable)
+						disposable.Dispose();
+				}
 			}
 		}
 
@@ -153,7 +145,9 @@ namespace Microsoft.Maui.Animations
 
 		void ForceFinishAnimations()
 		{
-			foreach (var animation in GetAnimationsSnapshot())
+			Animation[] animations = [.._animations];
+
+			foreach (var animation in animations)
 			{
 				ForceFinish(animation);
 			}
@@ -163,33 +157,8 @@ namespace Microsoft.Maui.Animations
 			void ForceFinish(Animation animation)
 			{
 				animation.ForceFinish();
-				RemoveAnimation(animation);
-				animation.RemoveFromParent();
-			}
-		}
-
-		Animation[] GetAnimationsSnapshot()
-		{
-			lock (_animationsLock)
-			{
-				return [.._animations];
-			}
-		}
-
-		bool RemoveAnimation(Animation animation)
-		{
-			lock (_animationsLock)
-			{
 				_animations.TryRemove(animation);
-				return _animations.Count == 0;
-			}
-		}
-
-		bool HasAnimations()
-		{
-			lock (_animationsLock)
-			{
-				return _animations.Count > 0;
+				animation.RemoveFromParent();
 			}
 		}
 
