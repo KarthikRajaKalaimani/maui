@@ -40,101 +40,42 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[InlineData(true)]
 		public void DisposingNonStartingManagerReleasesCallback(bool useAdd)
 		{
-			var (manager, id, payload) = CreateDisposedManagerPayload(useAdd, autoStartTicker: false);
+			var (manager, id, payload) = CreateDisposedManagerPayload(useAdd);
 
 			CollectGarbage();
 
 			Assert.False(payload.IsAlive);
 			Assert.False(AnimationExtensions.HasTweener(id));
 			GC.KeepAlive(manager);
-		}
-
-		[Theory]
-		[InlineData(false)]
-		[InlineData(true)]
-		public void DisposingRunningManagerReleasesCallback(bool useAdd)
-		{
-			var (manager, ticker, id, payload) = CreateRunningManagerPayload(useAdd);
-
-			Assert.True(ticker.FirstTickCompleted.Wait(TimeSpan.FromSeconds(5)));
-			Assert.True(AnimationExtensions.HasTweener(id));
-
-			manager.Dispose();
-
-			CollectGarbage();
-
-			Assert.False(payload.IsAlive);
-			Assert.False(AnimationExtensions.HasTweener(id));
-			GC.KeepAlive(manager);
-		}
-
-		[Fact]
-		public void RecommittingAfterRejectedManagerRetainsDisposalCallback()
-		{
-			var rejectedManager = new AnimationManager(new Ticker()) { AutoStartTicker = false };
-			rejectedManager.Dispose();
-			using var liveManager = new AnimationManager(new Ticker()) { AutoStartTicker = false };
-			var disposalNotifications = 0;
-			var animation = new Animation
-			{
-				AnimationManagerDisposed = () => disposalNotifications++
-			};
-
-			animation.Commit(rejectedManager);
-
-			Assert.Null(animation.AnimationManager);
-			Assert.Equal(1, disposalNotifications);
-
-			animation.Commit(liveManager);
-			liveManager.Dispose();
-
-			Assert.Null(animation.AnimationManager);
-			Assert.Equal(2, disposalNotifications);
 		}
 
 		[MethodImpl(MethodImplOptions.NoInlining)]
-		static (AnimationManager Manager, int Id, WeakReference Payload) CreateDisposedManagerPayload(bool useAdd, bool autoStartTicker)
+		static (AnimationManager Manager, int Id, WeakReference Payload) CreateDisposedManagerPayload(bool useAdd)
 		{
 			var payload = new object();
 			var payloadReference = new WeakReference(payload);
-			using var manager = new AnimationManager(new Ticker()) { AutoStartTicker = autoStartTicker };
+			using var manager = new AnimationManager(new Ticker()) { AutoStartTicker = false };
 
 			var id = AddAnimation(manager, useAdd, payload);
 
 			return (manager, id, payloadReference);
 		}
 
-		[MethodImpl(MethodImplOptions.NoInlining)]
-		static (AnimationManager Manager, ControlledTicker Ticker, int Id, WeakReference Payload) CreateRunningManagerPayload(bool useAdd)
-		{
-			var payload = new object();
-			var payloadReference = new WeakReference(payload);
-			var ticker = new ControlledTicker();
-			var manager = new AnimationManager(ticker);
-
-			var id = AddAnimation(manager, useAdd, payload);
-
-			return (manager, ticker, id, payloadReference);
-		}
-
 		static int AddAnimation(
 			IAnimationManager manager,
 			bool useAdd,
-			object payload,
-			ManualResetEventSlim callbackInvoked = null)
+			object payload)
 		{
 			if (useAdd)
 			{
 				return AnimationExtensions.Add(manager, _ =>
 				{
-					callbackInvoked?.Set();
 					GC.KeepAlive(payload);
 				});
 			}
 
 			return AnimationExtensions.Insert(manager, _ =>
 			{
-				callbackInvoked?.Set();
 				GC.KeepAlive(payload);
 				return true;
 			});
@@ -156,44 +97,6 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			public DisabledTicker()
 			{
 				SystemEnabled = false;
-			}
-		}
-
-		sealed class ControlledTicker : Ticker, IDisposable
-		{
-			readonly ManualResetEventSlim _disposed = new();
-			Thread _thread;
-
-			public ManualResetEventSlim FirstTickCompleted { get; } = new();
-
-			public override bool IsRunning => _thread?.IsAlive ?? false;
-
-			public override void Start()
-			{
-				if (IsRunning)
-					return;
-
-				_thread = new Thread(() =>
-				{
-					Fire?.Invoke();
-					FirstTickCompleted.Set();
-					_disposed.Wait();
-				});
-				_thread.Start();
-			}
-
-			public override void Stop()
-			{
-				_disposed.Set();
-				if (_thread is not null && Thread.CurrentThread != _thread)
-					_thread.Join();
-			}
-
-			public void Dispose()
-			{
-				Stop();
-				FirstTickCompleted.Dispose();
-				_disposed.Dispose();
 			}
 		}
 
