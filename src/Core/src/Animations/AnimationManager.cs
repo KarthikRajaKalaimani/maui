@@ -131,7 +131,9 @@ namespace Microsoft.Maui.Animations
 					}
 
 					if (Ticker is IDisposable disposable)
+					{
 						disposable.Dispose();
+					}
 				}
 			}
 		}
