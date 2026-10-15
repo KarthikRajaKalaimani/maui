@@ -8,6 +8,8 @@ namespace Microsoft.Maui.Handlers
 	public partial class EditorHandler : ViewHandler<IEditor, TextBox>
 	{
 		bool _set;
+		bool _updatingAutoCapitalization;
+		string _previousText = string.Empty;
 
 		protected override TextBox CreatePlatformView() =>
 			new TextBox
@@ -28,6 +30,7 @@ namespace Microsoft.Maui.Handlers
 
 		protected override void ConnectHandler(TextBox platformView)
 		{
+			_previousText = platformView.Text;
 			platformView.TextChanged += OnTextChanged;
 			platformView.LostFocus += OnLostFocus;
 			platformView.SizeChanged += OnPlatformViewSizeChanged;
@@ -38,6 +41,9 @@ namespace Microsoft.Maui.Handlers
 			platformView.SizeChanged -= OnPlatformViewSizeChanged;
 			platformView.TextChanged -= OnTextChanged;
 			platformView.LostFocus -= OnLostFocus;
+
+			_previousText = string.Empty;
+			_updatingAutoCapitalization = false;
 
 			if (_set)
 				platformView.SelectionChanged -= OnSelectionChanged;
@@ -93,8 +99,58 @@ namespace Microsoft.Maui.Handlers
 		public static void MapKeyboard(IEditorHandler handler, IEditor editor) =>
 			handler.PlatformView?.UpdateKeyboard(editor);
 
-		void OnTextChanged(object sender, TextChangedEventArgs args) =>
-			VirtualView?.UpdateText(PlatformView.Text);
+		void OnTextChanged(object sender, TextChangedEventArgs args)
+		{
+			if (_updatingAutoCapitalization)
+				return;
+
+			var currentText = PlatformView.Text;
+
+			if (VirtualView is IEditor editor &&
+				PlatformView.FocusState != FocusState.Unfocused &&
+				TryGetSingleCharacterInsertion(_previousText, currentText, out var insertionIndex, out var insertedCharacter) &&
+				KeyboardAutoCapitalization.TryCapitalizeCharacter(
+					_previousText,
+					insertionIndex,
+					insertedCharacter,
+					editor.Keyboard,
+					out var capitalizedCharacter))
+			{
+				_updatingAutoCapitalization = true;
+				currentText = currentText.Remove(insertionIndex, 1)
+					.Insert(insertionIndex, capitalizedCharacter.ToString());
+				PlatformView.Text = currentText;
+				PlatformView.SelectionStart = insertionIndex + 1;
+				_updatingAutoCapitalization = false;
+			}
+
+			_previousText = currentText;
+			VirtualView?.UpdateText(currentText);
+		}
+
+		static bool TryGetSingleCharacterInsertion(
+			string previousText,
+			string currentText,
+			out int insertionIndex,
+			out char insertedCharacter)
+		{
+			insertionIndex = -1;
+			insertedCharacter = default;
+
+			if (currentText.Length != previousText.Length + 1)
+				return false;
+
+			var index = 0;
+			while (index < previousText.Length && previousText[index] == currentText[index])
+				index++;
+
+			if (!currentText.AsSpan(index + 1).SequenceEqual(previousText.AsSpan(index)))
+				return false;
+
+			insertionIndex = index;
+			insertedCharacter = currentText[index];
+			return true;
+		}
 
 		void OnLostFocus(object? sender, RoutedEventArgs e) =>
 			VirtualView?.Completed();
