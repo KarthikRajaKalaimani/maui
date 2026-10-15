@@ -276,8 +276,41 @@ namespace Microsoft.Maui.Handlers
 				}
 			}
 
-			bool OnShouldChangeText(UITextView textView, NSRange range, string replacementString) =>
-				VirtualView?.TextWithinMaxLength(textView.Text, range, replacementString) ?? false;
+			bool OnShouldChangeText(UITextView textView, NSRange range, string replacementString)
+			{
+				if (VirtualView is not IEditor virtualView)
+					return false;
+
+				var text = textView.Text ?? string.Empty;
+
+				if (OperatingSystem.IsMacCatalyst() &&
+					replacementString.Length == 1 &&
+					KeyboardAutoCapitalization.TryCapitalizeCharacter(
+						text,
+						(int)range.Location,
+						replacementString[0],
+						virtualView.Keyboard,
+						out var capitalizedCharacter))
+				{
+					var replacement = capitalizedCharacter.ToString();
+					if (!virtualView.TextWithinMaxLength(text, range, replacement))
+						return false;
+
+					textView.Text = text.Remove((int)range.Location, (int)range.Length)
+						.Insert((int)range.Location, replacement);
+
+					var cursorPosition = textView.GetPosition(
+						textView.BeginningOfDocument,
+						(int)range.Location + replacement.Length);
+
+					if (cursorPosition is not null)
+						textView.SelectedTextRange = textView.GetTextRange(cursorPosition, cursorPosition);
+
+					return false;
+				}
+
+				return virtualView.TextWithinMaxLength(text, range, replacementString);
+			}
 
 			void OnStarted(object? sender, EventArgs eventArgs)
 			{
