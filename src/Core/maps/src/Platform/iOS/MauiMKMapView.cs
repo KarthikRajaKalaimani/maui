@@ -17,6 +17,7 @@ namespace Microsoft.Maui.Maps.Platform
 		object? _lastTouchedView;
 		UITapGestureRecognizer? _mapClickedGestureRecognizer;
 		HashSet<IMapElement>? _trackedMapElements;
+		Dictionary<NativeHandle, IMapElement>? _mapElementsByOverlay;
 
 		public MauiMKMapView(IMapHandler handler)
 		{
@@ -147,13 +148,10 @@ namespace Microsoft.Maui.Maps.Platform
 			}
 
 			var elements = Overlays;
-			if (elements == null)
-				return;
+			_mapElementsByOverlay = null;
 
-			foreach (IMKOverlay overlay in elements)
-			{
-				RemoveOverlay(overlay);
-			}
+			if (elements?.Length > 0)
+				RemoveOverlays(elements);
 		}
 
 		internal void PrepareForReuse()
@@ -169,6 +167,8 @@ namespace Microsoft.Maui.Maps.Platform
 		internal void AddElements(IList elements)
 		{
 			_trackedMapElements ??= new HashSet<IMapElement>(ReferenceEqualityComparer.Instance);
+			_mapElementsByOverlay ??= new Dictionary<NativeHandle, IMapElement>();
+			var overlays = new List<IMKOverlay>(elements.Count);
 
 			foreach (IMapElement element in elements)
 			{
@@ -197,21 +197,33 @@ namespace Microsoft.Maui.Maps.Platform
 				if (overlay != null)
 				{
 					element.MapElementId = overlay;
-					AddOverlay(overlay);
+					_mapElementsByOverlay[overlay.Handle] = element;
+					overlays.Add(overlay);
 				}
 			}
+
+			if (overlays.Count > 0)
+				AddOverlays(overlays.ToArray());
 		}
 
 		internal void RemoveElements(IList elements)
 		{
+			var overlays = new List<IMKOverlay>(elements.Count);
+
 			foreach (IMapElement element in elements)
 			{
 				if (element.MapElementId is IMKOverlay overlay)
-					RemoveOverlay(overlay);
+				{
+					_mapElementsByOverlay?.Remove(overlay.Handle);
+					overlays.Add(overlay);
+				}
 
 				_trackedMapElements?.Remove(element);
 				element.MapElementId = null;
 			}
+
+			if (overlays.Count > 0)
+				RemoveOverlays(overlays.ToArray());
 		}
 
 		void Startup()
@@ -328,17 +340,9 @@ namespace Microsoft.Maui.Maps.Platform
 		T? GetMapElement<T>(IMKOverlay mkPolyline) where T : MKOverlayRenderer
 		{
 			_handlerRef.TryGetTarget(out IMapHandler? handler);
-			var map = handler?.VirtualView;
-			IMapElement mapElement = default!;
-			for (int i = 0; i < map?.Elements.Count; i++)
-			{
-				var element = map.Elements[i];
-				if (ReferenceEquals(element.MapElementId, mkPolyline))
-				{
-					mapElement = element;
-					break;
-				}
-			}
+			IMapElement? mapElement = null;
+			_mapElementsByOverlay?.TryGetValue(mkPolyline.Handle, out mapElement);
+
 			//Make sure we Disconnect old handler we don't want to reuse that one
 			mapElement?.Handler?.DisconnectHandler();
 			return mapElement?.ToHandler(handler?.MauiContext!).PlatformView as T;

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -334,6 +335,36 @@ namespace Microsoft.Maui.Maps.Handlers
 					mapHandler.SyncMapElements((IList)map.Elements);
 				}
 			}
+		}
+
+		void UpdateMapElements(NotifyCollectionChangedEventArgs args)
+		{
+			if (Map == null)
+				return;
+
+			PlatformView?.Post(() =>
+			{
+				var currentView = ((IElementHandler)this).VirtualView as IMap;
+				if (Map == null || currentView == null)
+					return;
+
+				switch (args.Action)
+				{
+					case NotifyCollectionChangedAction.Add when args.NewItems != null:
+						AddMapElements(args.NewItems);
+						break;
+					case NotifyCollectionChangedAction.Remove when args.OldItems != null:
+						RemoveMapElements(args.OldItems);
+						break;
+					case NotifyCollectionChangedAction.Replace when args.OldItems != null && args.NewItems != null:
+						RemoveMapElements(args.OldItems);
+						AddMapElements(args.NewItems);
+						break;
+					default:
+						SyncMapElements((IList)currentView.Elements);
+						break;
+				}
+			});
 		}
 
 		internal void OnMapReady(GoogleMap map)
@@ -703,6 +734,85 @@ namespace Microsoft.Maui.Maps.Handlers
 				{
 					AddCircle(circle);
 				}
+			}
+		}
+
+		void AddMapElements(IList mapElements)
+		{
+			if (Map == null || MauiContext == null)
+				return;
+
+			foreach (var element in mapElements)
+			{
+				if (element is IGeoPathMapElement geoPath)
+				{
+					if (element is IFilledMapElement)
+						AddPolygon(geoPath);
+					else
+						AddPolyline(geoPath);
+				}
+				else if (element is ICircleMapElement circle)
+				{
+					AddCircle(circle);
+				}
+			}
+		}
+
+		void RemoveMapElements(IList mapElements)
+		{
+			foreach (var element in mapElements)
+			{
+				if (element is not IMapElement mapElement || mapElement.MapElementId is not string nativeId)
+					continue;
+
+				if (element is IFilledMapElement && _polygons != null)
+				{
+					for (int i = _polygons.Count - 1; i >= 0; i--)
+					{
+						if (_polygons[i].Id == nativeId)
+						{
+							_polygons[i].Remove();
+							_polygons.RemoveAt(i);
+							break;
+						}
+					}
+
+					if (_polygons.Count == 0)
+						_polygons = null;
+				}
+				else if (element is IGeoPathMapElement && _polylines != null)
+				{
+					for (int i = _polylines.Count - 1; i >= 0; i--)
+					{
+						if (_polylines[i].Id == nativeId)
+						{
+							_polylines[i].Remove();
+							_polylines.RemoveAt(i);
+							break;
+						}
+					}
+
+					if (_polylines.Count == 0)
+						_polylines = null;
+				}
+				else if (element is ICircleMapElement && _circles != null)
+				{
+					for (int i = _circles.Count - 1; i >= 0; i--)
+					{
+						if (_circles[i].Id == nativeId)
+						{
+							_circles[i].Remove();
+							_circles.RemoveAt(i);
+							break;
+						}
+					}
+
+					if (_circles.Count == 0)
+						_circles = null;
+				}
+
+				ClearTrackedMapElementId(nativeId);
+				mapElement.MapElementId = null;
 			}
 		}
 

@@ -1,4 +1,6 @@
-﻿#if __IOS__ || MACCATALYST
+﻿using System.Collections.Specialized;
+
+#if __IOS__ || MACCATALYST
 using PlatformView = Microsoft.Maui.Maps.Platform.MauiMKMapView;
 #elif MONOANDROID
 using PlatformView = Android.Gms.Maps.MapView;
@@ -39,6 +41,7 @@ namespace Microsoft.Maui.Maps.Handlers
 		{
 			[nameof(IMap.MoveToRegion)] = MapMoveToRegion,
 			[nameof(IMapHandler.UpdateMapElement)] = MapUpdateMapElement,
+			[nameof(MapElementsCollectionChanged)] = MapElementsCollectionChanged,
 		};
 
 		/// <summary>
@@ -75,6 +78,19 @@ namespace Microsoft.Maui.Maps.Handlers
 				return;
 
 			handler.UpdateMapElement(args.MapElement);
+		}
+
+		internal static void MapElementsCollectionChanged(IMapHandler handler, IMap map, object? arg)
+		{
+#if MONOANDROID || __IOS__ || MACCATALYST
+			if (handler is MapHandler mapHandler && arg is NotifyCollectionChangedEventArgs args)
+			{
+				mapHandler.UpdateMapElements(args);
+				return;
+			}
+#endif
+
+			handler.UpdateValue(nameof(IMap.Elements));
 		}
 	}
 }

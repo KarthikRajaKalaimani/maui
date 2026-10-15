@@ -236,7 +236,7 @@ namespace Microsoft.Maui.Controls.Maps
 
 		void MapElementsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
 		{
-			Handler?.UpdateValue(nameof(IMap.Elements));
+			Handler?.Invoke(nameof(MapElementsCollectionChanged), e);
 			if (e.NewItems is not null)
 			{
 				foreach (MapElement item in e.NewItems)

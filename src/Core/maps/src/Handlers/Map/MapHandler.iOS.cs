@@ -1,4 +1,9 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Linq;
+using CoreFoundation;
 using CoreLocation;
 using MapKit;
 using Microsoft.Maui.Handlers;
@@ -9,7 +14,14 @@ namespace Microsoft.Maui.Maps.Handlers
 
 	public partial class MapHandler : ViewHandler<IMap, MauiMKMapView>
 	{
+		static readonly TimeSpan MapElementBatchInterval = TimeSpan.FromMilliseconds(16);
+
 		CLLocationManager? _locationManager;
+		readonly HashSet<IMapElement> _pendingMapElementAdds = new(ReferenceEqualityComparer.Instance);
+		readonly HashSet<IMapElement> _pendingMapElementRemoves = new(ReferenceEqualityComparer.Instance);
+		bool _mapElementUpdateScheduled;
+		bool _mapElementsRequireFullSync;
+		bool _isConnected;
 
 		protected override MauiMKMapView CreatePlatformView()
 		{
@@ -19,11 +31,14 @@ namespace Microsoft.Maui.Maps.Handlers
 		protected override void ConnectHandler(MauiMKMapView platformView)
 		{
 			base.ConnectHandler(platformView);
+			_isConnected = true;
 			_locationManager = new CLLocationManager();
 		}
 
 		protected override void DisconnectHandler(MauiMKMapView platformView)
 		{
+			_isConnected = false;
+			ClearPendingMapElementUpdates();
 			base.DisconnectHandler(platformView);
 
 			// This handler is done with the MKMapView; we can put it in the pool
@@ -84,6 +99,95 @@ namespace Microsoft.Maui.Maps.Handlers
 		{
 			handler.PlatformView.ClearMapElements();
 			handler.PlatformView.AddElements((IList)map.Elements);
+		}
+
+		void UpdateMapElements(NotifyCollectionChangedEventArgs args)
+		{
+			switch (args.Action)
+			{
+				case NotifyCollectionChangedAction.Add when args.NewItems != null:
+					QueueMapElementAdds(args.NewItems);
+					break;
+				case NotifyCollectionChangedAction.Remove when args.OldItems != null:
+					QueueMapElementRemoves(args.OldItems);
+					break;
+				case NotifyCollectionChangedAction.Replace when args.OldItems != null && args.NewItems != null:
+					QueueMapElementRemoves(args.OldItems);
+					QueueMapElementAdds(args.NewItems);
+					break;
+				default:
+					_pendingMapElementAdds.Clear();
+					_pendingMapElementRemoves.Clear();
+					_mapElementsRequireFullSync = true;
+					break;
+			}
+
+			if (_mapElementUpdateScheduled)
+				return;
+
+			_mapElementUpdateScheduled = true;
+			DispatchQueue.MainQueue.DispatchAfter(
+				new DispatchTime(DispatchTime.Now, MapElementBatchInterval),
+				ProcessPendingMapElementUpdates);
+		}
+
+		void QueueMapElementAdds(IList elements)
+		{
+			foreach (var item in elements)
+			{
+				if (item is not IMapElement element)
+					continue;
+
+				if (!_pendingMapElementRemoves.Remove(element))
+					_pendingMapElementAdds.Add(element);
+			}
+		}
+
+		void QueueMapElementRemoves(IList elements)
+		{
+			foreach (var item in elements)
+			{
+				if (item is not IMapElement element)
+					continue;
+
+				if (!_pendingMapElementAdds.Remove(element))
+					_pendingMapElementRemoves.Add(element);
+			}
+		}
+
+		void ProcessPendingMapElementUpdates()
+		{
+			_mapElementUpdateScheduled = false;
+
+			if (!_isConnected || ((IElementHandler)this).VirtualView is not IMap map)
+			{
+				ClearPendingMapElementUpdates();
+				return;
+			}
+
+			if (_mapElementsRequireFullSync)
+			{
+				PlatformView.ClearMapElements();
+				PlatformView.AddElements((IList)map.Elements);
+			}
+			else
+			{
+				if (_pendingMapElementRemoves.Count > 0)
+					PlatformView.RemoveElements(_pendingMapElementRemoves.ToArray());
+
+				if (_pendingMapElementAdds.Count > 0)
+					PlatformView.AddElements(_pendingMapElementAdds.ToArray());
+			}
+
+			ClearPendingMapElementUpdates();
+		}
+
+		void ClearPendingMapElementUpdates()
+		{
+			_pendingMapElementAdds.Clear();
+			_pendingMapElementRemoves.Clear();
+			_mapElementUpdateScheduled = false;
+			_mapElementsRequireFullSync = false;
 		}
 
 		public static void MapMoveToRegion(IMapHandler handler, IMap map, object? arg)
