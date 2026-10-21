@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using CoreGraphics;
 using Foundation;
 using Microsoft.Maui.Devices;
@@ -29,6 +30,74 @@ namespace Microsoft.Maui.Handlers
 			var platformEditor = new MauiTextView();
 			platformEditor.AddMauiDoneAccessoryView(this);
 			return platformEditor;
+		}
+
+		private static string ApplyCapitalization(string text, UITextAutocapitalizationType mode)
+		{
+			return mode switch
+			{
+				UITextAutocapitalizationType.None =>
+					text,
+
+				UITextAutocapitalizationType.AllCharacters =>
+					text.ToUpper(System.Globalization.CultureInfo.CurrentCulture),
+
+				UITextAutocapitalizationType.Words =>
+					CapitalizeWords(text),
+
+				UITextAutocapitalizationType.Sentences =>
+					CapitalizeSentences(text),
+
+				_ => text
+			};
+		}
+
+		private static string CapitalizeWords(string text)
+		{
+			System.Globalization.TextInfo textInfo =
+		CultureInfo.CurrentCulture.TextInfo;
+			return textInfo.ToTitleCase(text.ToLower(CultureInfo.CurrentCulture));
+		}
+
+		private static string CapitalizeAllCharacters(string text)
+		{
+			return text.ToUpper(System.Globalization.CultureInfo.CurrentCulture);
+		}
+
+		private static string CapitalizeSentences(string text)
+		{
+			var chars = text.ToCharArray();
+
+			bool capitalizeNext = true;
+
+			for (int i = 0; i < chars.Length; i++)
+			{
+				if (char.IsWhiteSpace(chars[i]))
+					continue;
+
+				if (capitalizeNext && char.IsLetter(chars[i]))
+				{
+					chars[i] = char.ToUpper(chars[i]);
+					capitalizeNext = false;
+				}
+				else if (chars[i] == '.'
+					  || chars[i] == '!'
+					  || chars[i] == '?')
+				{
+					capitalizeNext = true;
+				}
+				else
+				{
+					capitalizeNext = false;
+				}
+			}
+
+			return new string(chars);
+		}
+
+		private static string CapitalizeNone(string text)
+		{
+			return text;
 		}
 
 		public override void SetVirtualView(IView view)
@@ -278,38 +347,31 @@ namespace Microsoft.Maui.Handlers
 
 			bool OnShouldChangeText(UITextView textView, NSRange range, string replacementString)
 			{
-				if (VirtualView is not IEditor virtualView)
-					return false;
-
-				var text = textView.Text ?? string.Empty;
-
-				if (OperatingSystem.IsMacCatalyst() &&
-					replacementString.Length == 1 &&
-					KeyboardAutoCapitalization.TryCapitalizeCharacter(
-						text,
-						(int)range.Location,
-						replacementString[0],
-						virtualView.Keyboard,
-						out var capitalizedCharacter))
+				if (!(VirtualView?.TextWithinMaxLength(textView.Text, range, replacementString) ?? false))
 				{
-					var replacement = capitalizedCharacter.ToString();
-					if (!virtualView.TextWithinMaxLength(text, range, replacement))
-						return false;
-
-					textView.Text = text.Remove((int)range.Location, (int)range.Length)
-						.Insert((int)range.Location, replacement);
-
-					var cursorPosition = textView.GetPosition(
-						textView.BeginningOfDocument,
-						(int)range.Location + replacement.Length);
-
-					if (cursorPosition is not null)
-						textView.SelectedTextRange = textView.GetTextRange(cursorPosition, cursorPosition);
-
 					return false;
 				}
 
-				return virtualView.TextWithinMaxLength(text, range, replacementString);
+				var currentText = textView.Text ?? string.Empty;
+
+				var updatedText = string.Concat(currentText.AsSpan(0, (int)range.Location), replacementString.AsSpan(),currentText.AsSpan((int)(range.Location + range.Length)));
+
+				updatedText = ApplyCapitalization(updatedText, textView.AutocapitalizationType);
+
+				textView.Text = updatedText;
+
+				VirtualView?.UpdateText(updatedText);
+
+				var cursorOffset = Math.Min((int)(range.Location + replacementString.Length), updatedText.Length);
+
+				var position = textView.GetPosition(textView.BeginningOfDocument, cursorOffset);
+
+				if (position != null)
+				{
+					textView.SelectedTextRange = textView.GetTextRange(position, position);
+				}
+
+				return false;
 			}
 
 			void OnStarted(object? sender, EventArgs eventArgs)
