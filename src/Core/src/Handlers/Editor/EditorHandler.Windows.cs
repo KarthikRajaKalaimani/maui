@@ -1,5 +1,6 @@
 #nullable enable
 using Microsoft.UI.Xaml;
+using System;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
