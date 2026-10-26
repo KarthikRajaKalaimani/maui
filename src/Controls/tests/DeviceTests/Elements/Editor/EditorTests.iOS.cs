@@ -1,6 +1,7 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Foundation;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Dispatching;
 using Microsoft.Maui.Handlers;
@@ -15,6 +16,42 @@ namespace Microsoft.Maui.DeviceTests
 	[Collection(ControlsHandlerTestBase.RunInNewWindowCollection)]
 	public partial class EditorTests
 	{
+		[Theory(DisplayName = "Keyboard Configures Native Autocapitalization")]
+		[InlineData(KeyboardFlags.CapitalizeSentence, "hello. world")]
+		[InlineData(KeyboardFlags.CapitalizeWord, "hello world")]
+		[InlineData(KeyboardFlags.CapitalizeCharacter, "hello")]
+		[InlineData(KeyboardFlags.CapitalizeNone, "hello. world")]
+		public async Task KeyboardConfiguresNativeAutocapitalization(
+			KeyboardFlags flags,
+			string input)
+		{
+			SetupBuilder();
+
+			var editor = new Editor
+			{
+				Keyboard = Keyboard.Create(flags)
+			};
+
+			await AttachAndRun<EditorHandler>(editor, handler =>
+			{
+				var nativeEditor = GetPlatformControl(handler);
+				var nativeDelegate = nativeEditor.Delegate;
+				Assert.NotNull(nativeDelegate);
+				var expectedAutocapitalizationType = flags switch
+				{
+					KeyboardFlags.CapitalizeSentence => UITextAutocapitalizationType.Sentences,
+					KeyboardFlags.CapitalizeWord => UITextAutocapitalizationType.Words,
+					KeyboardFlags.CapitalizeCharacter => UITextAutocapitalizationType.AllCharacters,
+					_ => UITextAutocapitalizationType.None
+				};
+
+				Assert.Equal(expectedAutocapitalizationType, nativeEditor.AutocapitalizationType);
+
+				var shouldApplyNativeEdit = nativeDelegate.ShouldChangeText(nativeEditor, new NSRange(0, 0), input);
+				Assert.True(shouldApplyNativeEdit);
+			});
+		}
+
 		static MauiTextView GetPlatformControl(EditorHandler handler) =>
 			handler.PlatformView;
 

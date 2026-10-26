@@ -352,26 +352,33 @@ namespace Microsoft.Maui.Handlers
 					return false;
 				}
 
-				var currentText = textView.Text ?? string.Empty;
-
-				var updatedText = string.Concat(currentText.AsSpan(0, (int)range.Location), replacementString.AsSpan(),currentText.AsSpan((int)(range.Location + range.Length)));
-
-				updatedText = ApplyCapitalization(updatedText, textView.AutocapitalizationType);
-
-				textView.Text = updatedText;
-
-				VirtualView?.UpdateText(updatedText);
-
-				var cursorOffset = Math.Min((int)(range.Location + replacementString.Length), updatedText.Length);
-
-				var position = textView.GetPosition(textView.BeginningOfDocument, cursorOffset);
-
-				if (position != null)
+				if (OperatingSystem.IsMacCatalyst())
 				{
-					textView.SelectedTextRange = textView.GetTextRange(position, position);
-				}
+					var currentText = textView.Text ?? string.Empty;
 
-				return false;
+					var updatedText = string.Concat(currentText.AsSpan(0, (int)range.Location), replacementString.AsSpan(), currentText.AsSpan((int)(range.Location + range.Length)));
+
+					updatedText = ApplyCapitalization(updatedText, textView.AutocapitalizationType);
+
+					textView.Text = updatedText;
+
+					VirtualView?.UpdateText(updatedText);
+
+					var cursorOffset = Math.Min((int)(range.Location + replacementString.Length), updatedText.Length);
+
+					var position = textView.GetPosition(textView.BeginningOfDocument, cursorOffset);
+
+					if (position != null)
+					{
+						textView.SelectedTextRange = textView.GetTextRange(position, position);
+					}
+
+					return false;
+				}
+				else
+				{
+					return true;
+				}
 			}
 
 			void OnStarted(object? sender, EventArgs eventArgs)
