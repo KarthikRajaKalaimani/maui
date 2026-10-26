@@ -56,6 +56,7 @@ namespace Microsoft.Maui.Platform
 				var spellcheckEnabled = (custom.Flags & KeyboardFlags.Spellcheck) == KeyboardFlags.Spellcheck;
 				var suggestionsEnabled = (custom.Flags & KeyboardFlags.Suggestions) == KeyboardFlags.Suggestions;
 
+
 				UITextAutocapitalizationType capSettings = UITextAutocapitalizationType.None;
 
 				// Sentence being first ensures that the behavior of ALL is backwards compatible
