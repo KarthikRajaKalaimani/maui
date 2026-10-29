@@ -164,7 +164,7 @@ namespace Microsoft.Maui.Maps.Platform
 			_lastTouchedView = null;
 		}
 
-		internal void AddElements(IList elements)
+		internal void AddElements(IList elements, nint? index = null)
 		{
 			_trackedMapElements ??= new HashSet<IMapElement>(ReferenceEqualityComparer.Instance);
 			_mapElementsByOverlay ??= new Dictionary<NativeHandle, IMapElement>();
@@ -203,7 +203,17 @@ namespace Microsoft.Maui.Maps.Platform
 			}
 
 			if (overlays.Count > 0)
-				AddOverlays(overlays.ToArray());
+			{
+				if (index is nint insertionIndex)
+				{
+					foreach (var overlay in overlays)
+						InsertOverlay(overlay, insertionIndex++);
+				}
+				else
+				{
+					AddOverlays(overlays.ToArray());
+				}
+			}
 		}
 
 		internal void RemoveElements(IList elements)

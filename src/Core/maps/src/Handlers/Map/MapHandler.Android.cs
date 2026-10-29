@@ -321,10 +321,11 @@ namespace Microsoft.Maui.Maps.Handlers
 			{
 				if (mapHandler.Map != null)
 				{
+					var nativeMap = mapHandler.Map;
 					mapHandler.PlatformView?.Post(() =>
 					{
 						var currentView = ((IElementHandler)mapHandler).VirtualView as IMap;
-						if (mapHandler.Map == null || currentView == null || !ReferenceEquals(currentView, map))
+						if (!ReferenceEquals(mapHandler.Map, nativeMap) || currentView == null || !ReferenceEquals(currentView, map))
 							return;
 
 						mapHandler.SyncMapElements((IList)currentView.Elements);
@@ -339,13 +340,15 @@ namespace Microsoft.Maui.Maps.Handlers
 
 		void UpdateMapElements(NotifyCollectionChangedEventArgs args)
 		{
-			if (Map == null)
+			var nativeMap = Map;
+			var virtualView = ((IElementHandler)this).VirtualView;
+			if (nativeMap == null || virtualView is not IMap)
 				return;
 
 			PlatformView?.Post(() =>
 			{
 				var currentView = ((IElementHandler)this).VirtualView as IMap;
-				if (Map == null || currentView == null)
+				if (!ReferenceEquals(Map, nativeMap) || currentView == null || !ReferenceEquals(currentView, virtualView))
 					return;
 
 				switch (args.Action)
@@ -744,6 +747,12 @@ namespace Microsoft.Maui.Maps.Handlers
 
 			foreach (var element in mapElements)
 			{
+				// A queued reset may already have synchronized this element.
+				if (element is IMapElement mapElement && mapElement.MapElementId is string id &&
+					_trackedMapElements != null && _trackedMapElements.TryGetValue(id, out var trackedElement) &&
+					ReferenceEquals(trackedElement, mapElement))
+					continue;
+
 				if (element is IGeoPathMapElement geoPath)
 				{
 					if (element is IFilledMapElement)

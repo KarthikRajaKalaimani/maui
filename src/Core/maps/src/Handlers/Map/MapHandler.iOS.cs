@@ -22,6 +22,7 @@ namespace Microsoft.Maui.Maps.Handlers
 		bool _mapElementUpdateScheduled;
 		bool _mapElementsRequireFullSync;
 		bool _isConnected;
+		int _mapElementUpdateVersion;
 
 		protected override MauiMKMapView CreatePlatformView()
 		{
@@ -97,12 +98,16 @@ namespace Microsoft.Maui.Maps.Handlers
 
 		public static void MapElements(IMapHandler handler, IMap map)
 		{
+			(handler as MapHandler)?.ClearPendingMapElementUpdates();
 			handler.PlatformView.ClearMapElements();
 			handler.PlatformView.AddElements((IList)map.Elements);
 		}
 
 		void UpdateMapElements(NotifyCollectionChangedEventArgs args)
 		{
+			if (!_isConnected || ((IElementHandler)this).VirtualView is not IMap)
+				return;
+
 			switch (args.Action)
 			{
 				case NotifyCollectionChangedAction.Add when args.NewItems != null:
@@ -112,8 +117,7 @@ namespace Microsoft.Maui.Maps.Handlers
 					QueueMapElementRemoves(args.OldItems);
 					break;
 				case NotifyCollectionChangedAction.Replace when args.OldItems != null && args.NewItems != null:
-					QueueMapElementRemoves(args.OldItems);
-					QueueMapElementAdds(args.NewItems);
+					_mapElementsRequireFullSync = true;
 					break;
 				default:
 					_pendingMapElementAdds.Clear();
@@ -126,9 +130,14 @@ namespace Microsoft.Maui.Maps.Handlers
 				return;
 
 			_mapElementUpdateScheduled = true;
+			var version = _mapElementUpdateVersion;
 			DispatchQueue.MainQueue.DispatchAfter(
 				new DispatchTime(DispatchTime.Now, MapElementBatchInterval),
-				ProcessPendingMapElementUpdates);
+				() =>
+				{
+					if (version == _mapElementUpdateVersion)
+						ProcessPendingMapElementUpdates();
+				});
 		}
 
 		void QueueMapElementAdds(IList elements)
@@ -138,7 +147,9 @@ namespace Microsoft.Maui.Maps.Handlers
 				if (item is not IMapElement element)
 					continue;
 
-				if (!_pendingMapElementRemoves.Remove(element))
+				if (_pendingMapElementRemoves.Remove(element))
+					_mapElementsRequireFullSync = true;
+				else
 					_pendingMapElementAdds.Add(element);
 			}
 		}
@@ -165,18 +176,35 @@ namespace Microsoft.Maui.Maps.Handlers
 				return;
 			}
 
+			var elements = map.Elements;
+			var additions = new List<IMapElement>(_pendingMapElementAdds.Count);
+			if (!_mapElementsRequireFullSync && _pendingMapElementAdds.Count > 0)
+			{
+				foreach (var element in elements)
+				{
+					if (_pendingMapElementAdds.Contains(element))
+						additions.Add(element);
+					else if (additions.Count > 0)
+					{
+						// Appending native overlays cannot represent a managed insertion.
+						_mapElementsRequireFullSync = true;
+						break;
+					}
+				}
+			}
+
 			if (_mapElementsRequireFullSync)
 			{
 				PlatformView.ClearMapElements();
-				PlatformView.AddElements((IList)map.Elements);
+				PlatformView.AddElements((IList)elements);
 			}
 			else
 			{
 				if (_pendingMapElementRemoves.Count > 0)
 					PlatformView.RemoveElements(_pendingMapElementRemoves.ToArray());
 
-				if (_pendingMapElementAdds.Count > 0)
-					PlatformView.AddElements(_pendingMapElementAdds.ToArray());
+				if (additions.Count > 0)
+					PlatformView.AddElements(additions);
 			}
 
 			ClearPendingMapElementUpdates();
@@ -184,6 +212,7 @@ namespace Microsoft.Maui.Maps.Handlers
 
 		void ClearPendingMapElementUpdates()
 		{
+			_mapElementUpdateVersion++;
 			_pendingMapElementAdds.Clear();
 			_pendingMapElementRemoves.Clear();
 			_mapElementUpdateScheduled = false;
@@ -199,8 +228,17 @@ namespace Microsoft.Maui.Maps.Handlers
 
 		public void UpdateMapElement(IMapElement element)
 		{
+			if (!_isConnected || _mapElementsRequireFullSync ||
+				_pendingMapElementAdds.Contains(element) || _pendingMapElementRemoves.Contains(element) ||
+				element.MapElementId is not IMKOverlay overlay)
+				return;
+
+			var index = Array.FindIndex(PlatformView.Overlays, candidate => candidate.Handle == overlay.Handle);
+			if (index < 0)
+				return;
+
 			PlatformView.RemoveElements(new[] { element });
-			PlatformView.AddElements(new[] { element });
+			PlatformView.AddElements(new[] { element }, index);
 		}
 
 		void MoveToRegion(MapSpan mapSpan, bool animated = true)
