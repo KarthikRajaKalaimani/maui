@@ -362,8 +362,6 @@ namespace Microsoft.Maui.Handlers
 
 					textView.Text = updatedText;
 
-					VirtualView?.UpdateText(updatedText);
-
 					var cursorOffset = Math.Min((int)(range.Location + replacementString.Length), updatedText.Length);
 
 					var position = textView.GetPosition(textView.BeginningOfDocument, cursorOffset);
