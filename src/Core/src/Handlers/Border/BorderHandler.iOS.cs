@@ -1,4 +1,5 @@
 ﻿using System;
+using Foundation;
 using UIKit;
 using PlatformView = UIKit.UIView;
 
@@ -11,7 +12,7 @@ namespace Microsoft.Maui.Handlers
 			_ = VirtualView ?? throw new InvalidOperationException($"{nameof(VirtualView)} must be set to create a {nameof(ContentView)}");
 			_ = MauiContext ?? throw new InvalidOperationException($"{nameof(MauiContext)} cannot be null");
 
-			return new ContentView
+			return new BorderContentView
 			{
 				CrossPlatformLayout = VirtualView
 			};
@@ -60,6 +61,31 @@ namespace Microsoft.Maui.Handlers
 
 				containerView.AddSubview(platformContent);
 				platformView.AddSubview(containerView);
+			}
+		}
+
+		sealed class BorderContentView : ContentView
+		{
+			// UIKit's automation traversal must see the content, not the anonymous clipping wrapper.
+			[Export("automationElements")]
+			public UIView[] GetAutomationElements()
+			{
+				foreach (var subview in Subviews)
+				{
+					if (subview.Tag != ContentView.ContentTag)
+						continue;
+
+					var contentViews = subview.Subviews;
+					if (!IsAccessibilityElement ||
+						(contentViews.Length == 1 && !string.IsNullOrEmpty(contentViews[0].AccessibilityIdentifier)))
+					{
+						return contentViews;
+					}
+
+					break;
+				}
+
+				return Array.Empty<UIView>();
 			}
 		}
 	}
