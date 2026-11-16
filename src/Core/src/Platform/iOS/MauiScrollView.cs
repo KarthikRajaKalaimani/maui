@@ -30,6 +30,8 @@ namespace Microsoft.Maui.Platform
 		/// </summary>
 		bool? _scrollViewDescendant;
 
+		bool _hasUnconditionalVerticalInset;
+
 		/// <summary>
 		/// The height constraint used in the last measure operation.
 		/// Used to determine if a re-measure is needed when constraints change.
@@ -251,6 +253,7 @@ namespace Microsoft.Maui.Platform
 				return false;
 
 			_previousEdges = safeAreaEdges;
+			_hasUnconditionalVerticalInset = false;
 
 			// Check if all edges have the same SafeAreaRegions value
 			if (leftRegion == topRegion && topRegion == rightRegion && rightRegion == bottomRegion)
@@ -648,7 +651,7 @@ namespace Microsoft.Maui.Platform
 						width += Bounds.Width + 1;
 					}
 
-					if (inflateHeight)
+					if (inflateHeight && !HasUnconditionalVerticalInset())
 					{
 						height = Bounds.Height + 1;
 					}
@@ -711,6 +714,31 @@ namespace Microsoft.Maui.Platform
 			_previousEffectiveUserInterfaceLayoutDirection = EffectiveUserInterfaceLayoutDirection;
 
 			return contentSize;
+		}
+
+		bool HasUnconditionalVerticalInset()
+		{
+			if (Window is null || this.FindResponder<UIViewController>()?.NavigationController is null)
+			{
+				_hasUnconditionalVerticalInset = false;
+				return false;
+			}
+
+			var inset = SystemAdjustedContentInset;
+			if (inset.Top <= 0 && inset.Bottom <= 0)
+			{
+				_hasUnconditionalVerticalInset = false;
+				return false;
+			}
+
+			if (AlwaysBounceVertical)
+				return true;
+
+			// A non-scrollable view with a system inset is already kept inset by UIKit.
+			if (Bounds.Height > 0 && ContentSize.Height <= Bounds.Height)
+				_hasUnconditionalVerticalInset = true;
+
+			return _hasUnconditionalVerticalInset;
 		}
 
 		bool IsInsidePageSheet()
@@ -901,6 +929,7 @@ namespace Microsoft.Maui.Platform
 			// Clear cached scroll view descendant status since the view hierarchy may have changed
 			_scrollViewDescendant = null;
 			_blockedEdgesCacheValid = false;
+			_hasUnconditionalVerticalInset = false;
 
 			// Mark safe area as invalidated since moving to a new window may change safe area
 			_safeAreaInvalidated = true;
@@ -911,6 +940,13 @@ namespace Microsoft.Maui.Platform
 				_invalidateParentWhenMovedToWindow = false;
 				this.InvalidateAncestorsMeasures();
 			}
+		}
+
+		/// <inheritdoc />
+		public override void MovedToSuperview()
+		{
+			base.MovedToSuperview();
+			_hasUnconditionalVerticalInset = false;
 		}
 	}
 }
