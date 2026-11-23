@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Android.Content;
 using Android.Content.Res;
 using Android.Graphics;
@@ -36,6 +37,7 @@ namespace Microsoft.Maui.Controls.Platform
 
 		// Track badge drawables per menu item ID for lifecycle management
 		static readonly ConcurrentDictionary<int, BadgeDrawable> _badgeDrawables = new();
+		static readonly ConditionalWeakTable<AToolbar, ToolbarBackgroundState> _toolbarBackgroundStates = new();
 
 		public static void UpdateIsVisible(this AToolbar nativeToolbar, Toolbar toolbar)
 		{
@@ -188,27 +190,77 @@ namespace Microsoft.Maui.Controls.Platform
 			{
 				Brush barBackground = toolbar.BarBackground;
 
-				if (barBackground is SolidColorBrush solidColor)
+				if (barBackground is SolidColorBrush { Color: not null } solidColor &&
+					nativeToolbar.Background is Drawable background)
 				{
-					var tintColor = solidColor.Color;
-					if (tintColor == null)
-					{
-						nativeToolbar.BackgroundTintMode = null;
-					}
-					else
-					{
-						nativeToolbar.BackgroundTintMode = PorterDuff.Mode.Src;
-						nativeToolbar.BackgroundTintList = ColorStateList.ValueOf(tintColor.ToPlatform());
-					}
+					_toolbarBackgroundStates.GetValue(nativeToolbar, static _ => new ToolbarBackgroundState())
+						.SetBackgroundColor(nativeToolbar, background, solidColor.Color.ToPlatform());
 				}
 				else
 				{
-					nativeToolbar.BackgroundTintMode = null;
-					nativeToolbar.BackgroundTintList = null;
-					nativeToolbar.UpdateBackground(barBackground);
+					if (_toolbarBackgroundStates.TryGetValue(nativeToolbar, out var backgroundState))
+						backgroundState.RestoreBackground(nativeToolbar);
+
+					if (barBackground is not SolidColorBrush)
+						nativeToolbar.UpdateBackground(barBackground);
 				}
 			}
 			nativeToolbar.UpdateBarTextColor(toolbar);
+		}
+
+		sealed class ToolbarBackgroundState
+		{
+			Drawable? _originalBackground;
+			Drawable? _tintedBackground;
+
+			public void SetBackgroundColor(AToolbar toolbar, Drawable background, global::Android.Graphics.Color color)
+			{
+				if (!ReferenceEquals(background, _tintedBackground))
+				{
+					_originalBackground = background;
+					_tintedBackground = background is GradientStrokeDrawable
+						? background.Mutate()
+						: background.GetConstantState()?.NewDrawable()?.Mutate() ?? background.Mutate();
+
+					// ConstantState does not include the drawable's runtime level or state.
+					_tintedBackground.SetLevel(background.Level);
+					_tintedBackground.SetState(background.GetState());
+				}
+
+				var tintedBackground = _tintedBackground!;
+
+				// Detach the drawable so a subsequent SetBackgroundResource call can replace it,
+				// even when it uses the same resource ID.
+				toolbar.SetBackground(null);
+				toolbar.SetBackground(tintedBackground);
+				tintedBackground.SetTintMode(PorterDuff.Mode.Src);
+				tintedBackground.SetTintList(ColorStateList.ValueOf(color));
+				_tintedBackground = tintedBackground;
+			}
+
+			public void RestoreBackground(AToolbar toolbar)
+			{
+				if (_tintedBackground is null)
+					return;
+
+				if (ReferenceEquals(toolbar.Background, _tintedBackground))
+				{
+					if (_originalBackground is not null && !ReferenceEquals(_originalBackground, _tintedBackground))
+					{
+						toolbar.SetBackground(null);
+						toolbar.SetBackground(_originalBackground);
+					}
+					else
+					{
+						// Keep GradientStrokeDrawable intact so UpdateBackground can remove it.
+						_tintedBackground.SetTintList(null);
+						_tintedBackground.SetTintMode(null);
+					}
+				}
+
+				_originalBackground = null;
+				_tintedBackground = null;
+			}
 		}
 
 		public static void UpdateIconColor(this AToolbar nativeToolbar, Toolbar toolbar)
