@@ -225,17 +225,13 @@ namespace Microsoft.Maui.Controls.Platform
 					// ConstantState does not include the drawable's runtime level or state.
 					_tintedBackground.SetLevel(background.Level);
 					_tintedBackground.SetState(background.GetState());
+
+					ReplaceBackgroundPreservingPadding(toolbar, _tintedBackground);
 				}
 
 				var tintedBackground = _tintedBackground!;
-
-				// Detach the drawable so a subsequent SetBackgroundResource call can replace it,
-				// even when it uses the same resource ID.
-				toolbar.SetBackground(null);
-				toolbar.SetBackground(tintedBackground);
 				tintedBackground.SetTintMode(PorterDuff.Mode.Src);
 				tintedBackground.SetTintList(ColorStateList.ValueOf(color));
-				_tintedBackground = tintedBackground;
 			}
 
 			public void RestoreBackground(AToolbar toolbar)
@@ -247,8 +243,8 @@ namespace Microsoft.Maui.Controls.Platform
 				{
 					if (_originalBackground is not null && !ReferenceEquals(_originalBackground, _tintedBackground))
 					{
-						toolbar.SetBackground(null);
-						toolbar.SetBackground(_originalBackground);
+						_originalBackground.SetLevel(_tintedBackground.Level);
+						ReplaceBackgroundPreservingPadding(toolbar, _originalBackground);
 					}
 					else
 					{
@@ -260,6 +256,27 @@ namespace Microsoft.Maui.Controls.Platform
 
 				_originalBackground = null;
 				_tintedBackground = null;
+			}
+
+			static void ReplaceBackgroundPreservingPadding(AToolbar toolbar, Drawable background)
+			{
+				bool isPaddingRelative = toolbar.IsPaddingRelative;
+				int paddingLeft = toolbar.PaddingLeft;
+				int paddingTop = toolbar.PaddingTop;
+				int paddingRight = toolbar.PaddingRight;
+				int paddingBottom = toolbar.PaddingBottom;
+				int paddingStart = toolbar.PaddingStart;
+				int paddingEnd = toolbar.PaddingEnd;
+
+				// Detach first so a subsequent SetBackgroundResource call can replace the
+				// background even when it uses the same resource ID.
+				toolbar.SetBackground(null);
+				toolbar.SetBackground(background);
+
+				if (isPaddingRelative)
+					toolbar.SetPaddingRelative(paddingStart, paddingTop, paddingEnd, paddingBottom);
+				else
+					toolbar.SetPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
 			}
 		}
 

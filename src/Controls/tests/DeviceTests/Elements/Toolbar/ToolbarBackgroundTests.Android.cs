@@ -103,9 +103,51 @@ namespace Microsoft.Maui.DeviceTests
 				Assert.Equal(5000, nativeToolbar.Background.Level);
 				Assert.Equal(AColor.Red.ToArgb(), RenderPixel(nativeToolbar.Background, 50).ToArgb());
 
+				nativeToolbar.Background.SetLevel(8000);
 				toolbar.BarBackground = null;
 				nativeToolbar.UpdateBarBackground(toolbar);
-				Assert.Equal(5000, nativeToolbar.Background.Level);
+				Assert.Equal(8000, nativeToolbar.Background.Level);
+			});
+		}
+
+		[Fact]
+		public async Task SolidBarColorPreservesExplicitToolbarPadding()
+		{
+			if (RuntimeFeature.IsMaterial3Enabled && RuntimeFeature.UseMauiAndroidSystemBarBackgrounds)
+				return;
+
+			EnsureHandlerCreated();
+			await InvokeOnMainThreadAsync(() =>
+			{
+				using var nativeToolbar = new AToolbar(MauiContext.Context);
+				nativeToolbar.Background = new InsetDrawable(new ColorDrawable(AColor.White), 10, 4, 10, 4);
+				nativeToolbar.SetPadding(1, 2, 3, 4);
+				var toolbar = new Controls.Toolbar(new ContentPage())
+				{
+					BarBackground = new SolidColorBrush(Colors.Red)
+				};
+
+				nativeToolbar.UpdateBarBackground(toolbar);
+				Assert.Equal((1, 2, 3, 4), (nativeToolbar.PaddingLeft, nativeToolbar.PaddingTop, nativeToolbar.PaddingRight, nativeToolbar.PaddingBottom));
+
+				toolbar.BarBackground = new SolidColorBrush(Colors.Blue);
+				nativeToolbar.UpdateBarBackground(toolbar);
+				Assert.Equal((1, 2, 3, 4), (nativeToolbar.PaddingLeft, nativeToolbar.PaddingTop, nativeToolbar.PaddingRight, nativeToolbar.PaddingBottom));
+
+				toolbar.BarBackground = null;
+				nativeToolbar.UpdateBarBackground(toolbar);
+				Assert.Equal((1, 2, 3, 4), (nativeToolbar.PaddingLeft, nativeToolbar.PaddingTop, nativeToolbar.PaddingRight, nativeToolbar.PaddingBottom));
+
+				nativeToolbar.SetPaddingRelative(5, 6, 7, 8);
+				toolbar.BarBackground = new SolidColorBrush(Colors.Green);
+				nativeToolbar.UpdateBarBackground(toolbar);
+				Assert.True(nativeToolbar.IsPaddingRelative);
+				Assert.Equal((5, 6, 7, 8), (nativeToolbar.PaddingStart, nativeToolbar.PaddingTop, nativeToolbar.PaddingEnd, nativeToolbar.PaddingBottom));
+
+				toolbar.BarBackground = null;
+				nativeToolbar.UpdateBarBackground(toolbar);
+				Assert.True(nativeToolbar.IsPaddingRelative);
+				Assert.Equal((5, 6, 7, 8), (nativeToolbar.PaddingStart, nativeToolbar.PaddingTop, nativeToolbar.PaddingEnd, nativeToolbar.PaddingBottom));
 			});
 		}
 
