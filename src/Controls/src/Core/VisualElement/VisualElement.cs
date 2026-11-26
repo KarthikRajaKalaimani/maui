@@ -2049,6 +2049,8 @@ namespace Microsoft.Maui.Controls
 		internal bool IsLoadedFired => _isLoadedFired;
 		EventHandler? _loaded;
 		EventHandler? _unloaded;
+		EventHandler? _pendingLoaded;
+#endif
 		bool _watchingPlatformLoaded;
 		Rect _frame = new Rect(0, 0, -1, -1);
 		event EventHandler? _windowChanged;
@@ -2497,12 +2499,16 @@ namespace Microsoft.Maui.Controls
 				// invoking _loaded
 				// This is only to make sure that new subscribers get invoked when the element is already loaded
 				// and a previous subscriber has already invoked the UpdatePlatformUnloadedLoadedWiring path
-				if (loadedAlreadyFired && _isLoadedFired
-#if IOS || MACCATALYST
-					&& (_deferredUnloadedPage is null || Window is not null)
-#endif
-					)
+				if (loadedAlreadyFired && _isLoadedFired)
 				{
+#if IOS || MACCATALYST
+					// A retained inactive tab is detached from the native window; notify this subscriber when it returns.
+					if (_deferredUnloadedPage is not null)
+					{
+						_pendingLoaded += value;
+						return;
+					}
+#endif
 					value?.Invoke(this, EventArgs.Empty);
 				}
 
@@ -2510,6 +2516,9 @@ namespace Microsoft.Maui.Controls
 			remove
 			{
 				_loaded -= value;
+#if IOS || MACCATALYST
+				_pendingLoaded -= value;
+#endif
 				UpdatePlatformUnloadedLoadedWiring(Window);
 			}
 		}
@@ -2554,6 +2563,10 @@ namespace Microsoft.Maui.Controls
 				return;
 
 			_isLoadedFired = true;
+#if IOS || MACCATALYST
+			// Pending subscribers are also in _loaded.
+			_pendingLoaded = null;
+#endif
 			_loaded?.Invoke(this, EventArgs.Empty);
 
 			// If the user is also watching unloaded we need to verify
@@ -2572,6 +2585,10 @@ namespace Microsoft.Maui.Controls
 				return;
 
 			_isLoadedFired = false;
+#if IOS || MACCATALYST
+			// Pending subscribers will receive Loaded with everyone else if the element loads again.
+			_pendingLoaded = null;
+#endif
 			_unloaded?.Invoke(this, EventArgs.Empty);
 
 			// If the user is also watching loaded we need to verify
@@ -2623,6 +2640,7 @@ namespace Microsoft.Maui.Controls
 					ClearDeferredUnloaded();
 					_isLoadedFired = false;
 				}
+				_pendingLoaded = null;
 #endif
 #if PLATFORM
 				_loadedUnloadedToken?.Dispose();
