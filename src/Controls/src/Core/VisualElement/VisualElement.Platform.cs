@@ -34,6 +34,9 @@ namespace Microsoft.Maui.Controls
 					ClearDeferredUnloaded();
 #endif
 					SendLoaded(false);
+#if IOS || MACCATALYST
+					SendPendingLoaded();
+#endif
 
 					// If SendLoaded caused the unloaded tokens to wire up
 					_loadedUnloadedToken?.Dispose();
@@ -69,6 +72,9 @@ namespace Microsoft.Maui.Controls
 					ClearDeferredUnloaded();
 #endif
 					SendLoaded(false);
+#if IOS || MACCATALYST
+					SendPendingLoaded();
+#endif
 
 					// If SendLoaded caused the unloaded tokens to wire up
 					_loadedUnloadedToken?.Dispose();
@@ -130,81 +136,89 @@ namespace Microsoft.Maui.Controls
 					SendUnloaded();
 				}
 			}
+		}
 
-			void OnPlatformLoaded()
+		void OnPlatformLoaded()
+		{
+#if IOS || MACCATALYST
+			if (_deferredUnloadedPage is not null)
 			{
-	#if IOS || MACCATALYST
-				if (_deferredUnloadedPage is not null)
-				{
-					ClearDeferredUnloaded();
-					HandlePlatformUnloadedLoaded();
-					return;
-				}
-	#endif
-				SendLoaded();
-			}
-
-			void OnPlatformUnloaded()
-			{
-	#if IOS || MACCATALYST
-				if (Handler?.PlatformView is PlatformView view && DeferUnloadedForRetainedTab(view))
-				{
-					HandlePlatformUnloadedLoaded();
-					return;
-				}
-
 				ClearDeferredUnloaded();
-	#endif
-				SendUnloaded();
+				HandlePlatformUnloadedLoaded();
+				return;
+			}
+#endif
+			SendLoaded();
+		}
+
+		void OnPlatformUnloaded()
+		{
+#if IOS || MACCATALYST
+			if (Handler?.PlatformView is PlatformView view && DeferUnloadedForRetainedTab(view))
+			{
+				HandlePlatformUnloadedLoaded();
+				return;
 			}
 
-	#if IOS || MACCATALYST
-			bool DeferUnloadedForRetainedTab(PlatformView view)
-			{
-				if (_isLoadedFired && Window?.Handler?.PlatformView is not null)
-				{
-					Element child = this;
-					while (child.Parent is Element parent)
-					{
-						// UIKit detaches an inactive tab's native page while its MAUI descendants remain parented.
-						if (child is Page page && parent is TabbedPage tabbedPage &&
-							tabbedPage.Handler?.PlatformView is PlatformView tabbedView && tabbedView.Window is not null &&
-							page.Handler?.PlatformView is PlatformView pageView && pageView.Window is null &&
-							(view == pageView || view.IsDescendantOfView(pageView)))
-						{
-							if (_deferredUnloadedPage != page || _deferredUnloadedTabbedPage != tabbedPage)
-							{
-								ClearDeferredUnloaded();
-								_deferredUnloadedPage = page;
-								_deferredUnloadedTabbedPage = tabbedPage;
-								page.HandlerChanged += OnDeferredTabHandlerChanged;
-								tabbedPage.HandlerChanged += OnDeferredTabHandlerChanged;
-							}
+			ClearDeferredUnloaded();
+#endif
+			SendUnloaded();
+		}
 
-							return true;
+#if IOS || MACCATALYST
+		bool DeferUnloadedForRetainedTab(PlatformView view)
+		{
+			if (_isLoadedFired && Window?.Handler?.PlatformView is not null)
+			{
+				Element child = this;
+				while (child.Parent is Element parent)
+				{
+					// UIKit detaches an inactive tab's native page while its MAUI descendants remain parented.
+					if (child is Page page && parent is TabbedPage tabbedPage &&
+						tabbedPage.Handler?.PlatformView is PlatformView tabbedView && tabbedView.Window is not null &&
+						page.Handler?.PlatformView is PlatformView pageView && pageView.Window is null &&
+						(view == pageView || view.IsDescendantOfView(pageView)))
+					{
+						if (_deferredUnloadedPage != page || _deferredUnloadedTabbedPage != tabbedPage)
+						{
+							ClearDeferredUnloaded();
+							_deferredUnloadedPage = page;
+							_deferredUnloadedTabbedPage = tabbedPage;
+							page.HandlerChanged += OnDeferredTabHandlerChanged;
+							tabbedPage.HandlerChanged += OnDeferredTabHandlerChanged;
 						}
 
-						child = parent;
+						return true;
 					}
+
+					child = parent;
 				}
-
-				ClearDeferredUnloaded();
-				return false;
 			}
 
-			void OnDeferredTabHandlerChanged(object? sender, EventArgs e) => UpdatePlatformUnloadedLoadedWiring(Window);
-
-			void ClearDeferredUnloaded()
-			{
-				if (_deferredUnloadedPage is not null)
-					_deferredUnloadedPage.HandlerChanged -= OnDeferredTabHandlerChanged;
-				if (_deferredUnloadedTabbedPage is not null)
-					_deferredUnloadedTabbedPage.HandlerChanged -= OnDeferredTabHandlerChanged;
-
-				_deferredUnloadedPage = null;
-				_deferredUnloadedTabbedPage = null;
-			}
-	#endif
+			ClearDeferredUnloaded();
+			return false;
 		}
+
+		void OnDeferredTabHandlerChanged(object? sender, EventArgs e) => UpdatePlatformUnloadedLoadedWiring(Window);
+
+		void ClearDeferredUnloaded()
+		{
+			if (_deferredUnloadedPage is not null)
+				_deferredUnloadedPage.HandlerChanged -= OnDeferredTabHandlerChanged;
+			if (_deferredUnloadedTabbedPage is not null)
+				_deferredUnloadedTabbedPage.HandlerChanged -= OnDeferredTabHandlerChanged;
+
+			_deferredUnloadedPage = null;
+			_deferredUnloadedTabbedPage = null;
+		}
+
+		// Delivers the initial Loaded callback to subscribers added while a retained tab was detached.
+		void SendPendingLoaded()
+		{
+			var pendingLoaded = _pendingLoaded;
+			_pendingLoaded = null;
+			pendingLoaded?.Invoke(this, EventArgs.Empty);
+		}
+#endif
 	}
 }

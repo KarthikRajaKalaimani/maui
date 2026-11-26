@@ -230,50 +230,40 @@ namespace Microsoft.Maui.Controls
 				double translationX, translationY, scaleX, scaleY, rotateX, rotateY, rotate;
 				if (transformName.StartsWith("translateX", StringComparison.OrdinalIgnoreCase) && TryParseTransformValue(value, out translationX))
 					bindable.SetValue(TranslationXProperty, translationX);
-				else if (transformName.StartsWith("translateY", StringComparison.OrdinalIgnoreCase) && TryParseTransformValue(value, out translationY))
+				else if (transformName.StartsWith("translateY", StringComparison.OrdinalIgnoreCase) && double.TryParse(value, out translationY))
 					bindable.SetValue(TranslationYProperty, translationY);
 				else if (transformName.StartsWith("translate", StringComparison.OrdinalIgnoreCase))
 				{
-					// translate(tx) is the same as translate(tx, 0)
 					var translate = value.Split(',');
-					translationY = 0;
-					if (TryParseTransformValue(translate[0], out translationX) && (translate.Length == 1 || TryParseTransformValue(translate[1], out translationY)))
+					if (double.TryParse(translate[0], out translationX) && double.TryParse(translate[1], out translationY))
 					{
 						bindable.SetValue(TranslationXProperty, translationX);
 						bindable.SetValue(TranslationYProperty, translationY);
 					}
 				}
-				else if (transformName.StartsWith("scaleX", StringComparison.OrdinalIgnoreCase) && TryParseTransformValue(value, out scaleX))
+				else if (transformName.StartsWith("scaleX", StringComparison.OrdinalIgnoreCase) && double.TryParse(value, out scaleX))
 					bindable.SetValue(ScaleXProperty, scaleX);
-				else if (transformName.StartsWith("scaleY", StringComparison.OrdinalIgnoreCase) && TryParseTransformValue(value, out scaleY))
+				else if (transformName.StartsWith("scaleY", StringComparison.OrdinalIgnoreCase) && double.TryParse(value, out scaleY))
 					bindable.SetValue(ScaleYProperty, scaleY);
 				else if (transformName.StartsWith("scale", StringComparison.OrdinalIgnoreCase))
 				{
-					// scale(s) is the same as scale(s, s)
 					var scale = value.Split(',');
-					if (TryParseTransformValue(scale[0], out scaleX))
+					if (double.TryParse(scale[0], out scaleX) && double.TryParse(scale[1], out scaleY))
 					{
-						scaleY = scaleX;
-						if (scale.Length == 1 || TryParseTransformValue(scale[1], out scaleY))
-						{
-							bindable.SetValue(ScaleXProperty, scaleX);
-							bindable.SetValue(ScaleYProperty, scaleY);
-						}
+						bindable.SetValue(ScaleXProperty, scaleX);
+						bindable.SetValue(ScaleYProperty, scaleY);
 					}
 				}
-				else if (transformName.StartsWith("rotateX", StringComparison.OrdinalIgnoreCase) && TryParseTransformValue(value, out rotateX))
+				else if (transformName.StartsWith("rotateX", StringComparison.OrdinalIgnoreCase) && double.TryParse(value, out rotateX))
 					bindable.SetValue(RotationXProperty, rotateX);
-				else if (transformName.StartsWith("rotateY", StringComparison.OrdinalIgnoreCase) && TryParseTransformValue(value, out rotateY))
+				else if (transformName.StartsWith("rotateY", StringComparison.OrdinalIgnoreCase) && double.TryParse(value, out rotateY))
 					bindable.SetValue(RotationYProperty, rotateY);
-				else if (transformName.StartsWith("rotate", StringComparison.OrdinalIgnoreCase) && TryParseTransformValue(value, out rotate))
+				else if (transformName.StartsWith("rotate", StringComparison.OrdinalIgnoreCase) && double.TryParse(value, out rotate))
 					bindable.SetValue(RotationProperty, rotate);
 				else
 					throw new FormatException("Invalid transform name");
 			}
 		}
-
-		static bool TryParseTransformValue(string value, out double result)
-			=> double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out result);
 
 		internal static readonly BindableProperty TransformOriginProperty =
 			BindableProperty.Create("TransformOrigin", typeof(Point), typeof(VisualElement), new Point(.5d, .5d),
@@ -2049,6 +2039,9 @@ namespace Microsoft.Maui.Controls
 		internal bool IsLoadedFired => _isLoadedFired;
 		EventHandler? _loaded;
 		EventHandler? _unloaded;
+#if IOS || MACCATALYST
+		EventHandler? _pendingLoaded;
+#endif
 		bool _watchingPlatformLoaded;
 		Rect _frame = new Rect(0, 0, -1, -1);
 		event EventHandler? _windowChanged;
@@ -2497,12 +2490,16 @@ namespace Microsoft.Maui.Controls
 				// invoking _loaded
 				// This is only to make sure that new subscribers get invoked when the element is already loaded
 				// and a previous subscriber has already invoked the UpdatePlatformUnloadedLoadedWiring path
-				if (loadedAlreadyFired && _isLoadedFired
-#if IOS || MACCATALYST
-					&& (_deferredUnloadedPage is null || Window is not null)
-#endif
-					)
+				if (loadedAlreadyFired && _isLoadedFired)
 				{
+#if IOS || MACCATALYST
+					// A retained inactive tab is detached from the native window; notify this subscriber when it returns.
+					if (_deferredUnloadedPage is not null)
+					{
+						_pendingLoaded += value;
+						return;
+					}
+#endif
 					value?.Invoke(this, EventArgs.Empty);
 				}
 
@@ -2510,6 +2507,9 @@ namespace Microsoft.Maui.Controls
 			remove
 			{
 				_loaded -= value;
+#if IOS || MACCATALYST
+				_pendingLoaded -= value;
+#endif
 				UpdatePlatformUnloadedLoadedWiring(Window);
 			}
 		}
@@ -2554,6 +2554,10 @@ namespace Microsoft.Maui.Controls
 				return;
 
 			_isLoadedFired = true;
+#if IOS || MACCATALYST
+			// Pending subscribers are also in _loaded.
+			_pendingLoaded = null;
+#endif
 			_loaded?.Invoke(this, EventArgs.Empty);
 
 			// If the user is also watching unloaded we need to verify
@@ -2572,6 +2576,10 @@ namespace Microsoft.Maui.Controls
 				return;
 
 			_isLoadedFired = false;
+#if IOS || MACCATALYST
+			// Pending subscribers will receive Loaded with everyone else if the element loads again.
+			_pendingLoaded = null;
+#endif
 			_unloaded?.Invoke(this, EventArgs.Empty);
 
 			// If the user is also watching loaded we need to verify
@@ -2623,6 +2631,7 @@ namespace Microsoft.Maui.Controls
 					ClearDeferredUnloaded();
 					_isLoadedFired = false;
 				}
+				_pendingLoaded = null;
 #endif
 #if PLATFORM
 				_loadedUnloadedToken?.Dispose();
