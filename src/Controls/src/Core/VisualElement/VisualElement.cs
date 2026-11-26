@@ -2049,6 +2049,7 @@ namespace Microsoft.Maui.Controls
 		internal bool IsLoadedFired => _isLoadedFired;
 		EventHandler? _loaded;
 		EventHandler? _unloaded;
+#if IOS || MACCATALYST
 		EventHandler? _pendingLoaded;
 #endif
 		bool _watchingPlatformLoaded;
