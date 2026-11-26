@@ -2463,6 +2463,8 @@ namespace Microsoft.Maui.Controls
 		/// <summary>
 		/// Indicates if an element is connected to the main object tree.
 		/// </summary>
+		/// <remarks>On iOS and Mac Catalyst, an element in a retained, inactive tab may report
+		/// <see langword="false"/> even if its <see cref="Unloaded"/> event has not fired.</remarks>
 		public bool IsLoaded
 		{
 			get
@@ -2480,7 +2482,8 @@ namespace Microsoft.Maui.Controls
 		/// <summary>
 		/// Occurs when an element has been constructed and added to the platform visual tree.
 		/// </summary>
-		/// <remarks>This event may occur before the element has been measured so should not be relied on for size information.</remarks>
+		/// <remarks>This event may occur before the element has been measured so should not be relied on for size information.
+		/// On iOS and Mac Catalyst, returning to a retained tab may not raise this event again if the element did not unload.</remarks>
 		public event EventHandler? Loaded
 		{
 			add
@@ -2494,7 +2497,11 @@ namespace Microsoft.Maui.Controls
 				// invoking _loaded
 				// This is only to make sure that new subscribers get invoked when the element is already loaded
 				// and a previous subscriber has already invoked the UpdatePlatformUnloadedLoadedWiring path
-				if (loadedAlreadyFired && _isLoadedFired)
+				if (loadedAlreadyFired && _isLoadedFired
+#if IOS || MACCATALYST
+					&& (_deferredUnloadedPage is null || Window is not null)
+#endif
+					)
 				{
 					value?.Invoke(this, EventArgs.Empty);
 				}
@@ -2510,6 +2517,8 @@ namespace Microsoft.Maui.Controls
 		/// <summary>
 		/// Occurs when an element is no longer connected to the platform visual tree.
 		/// </summary>
+		/// <remarks>On iOS and Mac Catalyst, switching tabs may retain content without raising this event,
+		/// even when its native view temporarily leaves the window.</remarks>
 		public event EventHandler? Unloaded
 		{
 			add
@@ -2608,6 +2617,13 @@ namespace Microsoft.Maui.Controls
 				if (newWindow is not null)
 					newWindow.HandlerChanged -= OnWindowHandlerChanged;
 
+#if IOS || MACCATALYST
+				if (_deferredUnloadedPage is not null)
+				{
+					ClearDeferredUnloaded();
+					_isLoadedFired = false;
+				}
+#endif
 #if PLATFORM
 				_loadedUnloadedToken?.Dispose();
 				_loadedUnloadedToken = null;
