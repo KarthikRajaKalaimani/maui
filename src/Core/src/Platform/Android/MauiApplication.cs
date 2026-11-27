@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using Android.App;
 using Android.Content;
 using Android.Content.Res;
@@ -68,6 +69,9 @@ namespace Microsoft.Maui
 
 		public override void OnConfigurationChanged(Configuration newConfig)
 		{
+			// Refresh the system culture without overriding cultures explicitly selected by the app.
+			CultureInfo.CurrentCulture.ClearCachedData();
+
 			_services?.InvokeLifecycleEvents<AndroidLifecycle.OnApplicationConfigurationChanged>(del => del(this, newConfig));
 
 			base.OnConfigurationChanged(newConfig);
